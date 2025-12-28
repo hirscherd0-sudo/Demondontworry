@@ -6,51 +6,102 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 const path = require('path');
 
-// Statische Dateien aus dem "public" Ordner bereitstellen
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Spielzustand Speicher
 const rooms = {};
 
-io.on('connection', (socket) => {
-    console.log('Ein Benutzer hat sich verbunden:', socket.id);
+// Hilfsfunktion: Zufällige Fragen-Felder generieren (nicht auf Start/Haus)
+function generateTrapFields() {
+    const traps = [];
+    while(traps.length < 8) {
+        // Pfad ist index 0-39. Vermeide Startfelder (0, 10, 20, 30) und erste Schritte (1, 11, 21, 31)
+        const r = Math.floor(Math.random() * 40);
+        const safeZones = [0, 1, 10, 11, 20, 21, 30, 31];
+        if(!traps.includes(r) && !safeZones.includes(r)) {
+            traps.push(r);
+        }
+    }
+    return traps;
+}
 
-    // Spieler tritt einem Raum bei
+io.on('connection', (socket) => {
+    console.log('Geist verbunden:', socket.id);
+
     socket.on('joinGame', (roomId) => {
         socket.join(roomId);
 
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 players: [],
+                status: 'waiting', // waiting, playing
+                host: socket.id,
+                trapFields: generateTrapFields(),
                 turnIndex: 0
             };
         }
 
-        // Spieler zur Liste hinzufügen (max 4)
-        if (rooms[roomId].players.length < 4) {
+        const room = rooms[roomId];
+
+        if (room.status === 'playing') {
+            socket.emit('errorMsg', 'Das Spiel läuft bereits!');
+            return;
+        }
+
+        if (room.players.length < 4) {
             const colors = ['red', 'blue', 'green', 'yellow'];
-            const playerColor = colors[rooms[roomId].players.length];
+            const playerColor = colors[room.players.length];
             
             const player = {
                 id: socket.id,
-                color: playerColor
+                color: playerColor,
+                isBot: false,
+                name: `Spieler ${room.players.length + 1}`
             };
-            rooms[roomId].players.push(player);
+            room.players.push(player);
 
-            // Dem Spieler seine Farbe mitteilen
-            socket.emit('playerJoined', { 
-                color: playerColor, 
-                playerIndex: rooms[roomId].players.length - 1 
+            // Update an alle: Wer ist da?
+            io.to(roomId).emit('lobbyUpdate', {
+                players: room.players,
+                isHost: room.host === socket.id,
+                hostId: room.host
             });
 
-            // Allen im Raum die neuen Spieler zeigen (optional für Lobby-Liste)
-            io.to(roomId).emit('updatePlayerList', rooms[roomId].players);
+            // Persönliche Info
+            socket.emit('joinedLobby', { 
+                color: playerColor, 
+                isHost: room.host === socket.id 
+            });
+
         } else {
-            socket.emit('errorMsg', 'Raum ist voll!');
+            socket.emit('errorMsg', 'Die Krypta ist voll (4 Spieler)!');
         }
     });
 
-    // Würfelwurf weiterleiten
+    // Nur der Host kann das starten
+    socket.on('requestStartGame', (roomId) => {
+        const room = rooms[roomId];
+        if(!room) return;
+        if(room.host !== socket.id) return;
+
+        // Fülle restliche Plätze mit Bots
+        const colors = ['red', 'blue', 'green', 'yellow'];
+        while(room.players.length < 4) {
+            const nextColor = colors[room.players.length];
+            room.players.push({
+                id: 'BOT_' + Date.now() + Math.random(),
+                color: nextColor,
+                isBot: true,
+                name: 'Horror Bot'
+            });
+        }
+
+        room.status = 'playing';
+        io.to(roomId).emit('gameStarted', {
+            players: room.players,
+            trapFields: room.trapFields
+        });
+    });
+
     socket.on('rollDice', ({ roomId, diceValue }) => {
         io.to(roomId).emit('diceRolled', { 
             playerId: socket.id, 
@@ -58,36 +109,35 @@ io.on('connection', (socket) => {
         });
     });
 
-    // Figur bewegen
     socket.on('movePiece', ({ roomId, pieceId, newPosition, isFinished }) => {
         io.to(roomId).emit('pieceMoved', { 
             playerId: socket.id, 
-            pieceId: pieceId, 
+            pieceId: pieceId, // 0-3
             newPosition: newPosition,
             isFinished: isFinished
         });
     });
 
-    // Zug beenden
     socket.on('endTurn', ({ roomId }) => {
         const room = rooms[roomId];
         if(room) {
-            room.turnIndex = (room.turnIndex + 1) % room.players.length;
+            room.turnIndex = (room.turnIndex + 1) % 4;
             io.to(roomId).emit('turnChanged', { 
-                activeColor: room.players[room.turnIndex].color 
+                activeColor: room.players[room.turnIndex].color,
+                isBot: room.players[room.turnIndex].isBot
             });
         }
     });
 
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        // Hinweis: Hier könnte man Logik einfügen, um den Raum zu resetten
+        // Simple Logic: Wenn Host geht, Raum kaputt (für Demo ok)
+        // Besser wäre: Nächsten Spieler zum Host machen
     });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server läuft auf Port ${PORT}`);
+  console.log(`Pforte zur Hölle geöffnet auf Port ${PORT}`);
 });
 
 
