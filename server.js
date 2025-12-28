@@ -8,12 +8,15 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Speicher für Räume
 const rooms = {};
-const TURN_TIMEOUT = 15000; // 15 Sekunden Zeit pro Zug
+const TURN_TIMEOUT = 20000; // 20 Sekunden (für 3x Würfeln)
+const socketRoomMap = {};
 
 function generateTrapFields() {
     const traps = [];
-    const safeZones = [0, 10, 20, 30]; 
+    // Startfelder (0, 10, 20, 30) sind sicher vor Fallen
+    const safeZones = [0, 10, 20, 30, 1, 11, 21, 31, 39, 9, 19, 29]; 
     while(traps.length < 8) {
         const r = Math.floor(Math.random() * 40);
         if(!traps.includes(r) && !safeZones.includes(r)) traps.push(r);
@@ -27,10 +30,9 @@ function nextTurn(roomId) {
 
     if(room.timer) clearTimeout(room.timer);
 
-    room.turnIndex = (room.turnIndex + 1) % 4;
+    room.turnIndex = (room.turnIndex + 1) % room.players.length;
     const activePlayer = room.players[room.turnIndex];
 
-    // Info senden
     io.to(roomId).emit('turnChanged', { 
         activeColor: activePlayer.color,
         activeName: activePlayer.name,
@@ -38,7 +40,6 @@ function nextTurn(roomId) {
         timeout: TURN_TIMEOUT / 1000
     });
 
-    // Server Timer starten
     room.timer = setTimeout(() => {
         io.to(roomId).emit('statusMessage', { msg: `Zeit abgelaufen für ${activePlayer.name}!` });
         nextTurn(roomId);
@@ -47,7 +48,13 @@ function nextTurn(roomId) {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (roomId) => {
+        if (rooms[roomId] && rooms[roomId].players.filter(p => !p.isBot).length === 0) {
+            delete rooms[roomId];
+        }
+
         socket.join(roomId);
+        socketRoomMap[socket.id] = roomId;
+
         if (!rooms[roomId]) {
             rooms[roomId] = {
                 players: [],
@@ -85,6 +92,8 @@ io.on('connection', (socket) => {
                 figure: figures[playerColor],
                 isHost: room.host === socket.id 
             });
+        } else {
+            socket.emit('errorMsg', 'Raum voll!');
         }
     });
 
@@ -92,7 +101,6 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
         if(!room || room.host !== socket.id) return;
 
-        // Bots
         const colors = ['red', 'blue', 'green', 'yellow'];
         const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
         
@@ -102,7 +110,7 @@ io.on('connection', (socket) => {
                 id: 'BOT_' + Math.random(),
                 color: c,
                 isBot: true,
-                name: 'Bot ' + figures[c],
+                name: 'Bot (' + figures[c] + ')',
                 figure: figures[c]
             });
         }
@@ -120,8 +128,9 @@ io.on('connection', (socket) => {
     socket.on('rollDice', ({ roomId }) => {
         const room = rooms[roomId];
         if(!room) return;
-        if(room.timer) clearTimeout(room.timer); // Timer stoppen
-
+        // Timer nicht komplett resetten, damit man nicht ewig Zeit schindet, 
+        // aber wir vertrauen dem Client Flow.
+        
         const val = Math.floor(Math.random() * 6) + 1;
         io.to(roomId).emit('diceRolled', { playerId: socket.id, value: val });
     });
@@ -136,6 +145,19 @@ io.on('connection', (socket) => {
 
     socket.on('endTurn', ({ roomId }) => {
         nextTurn(roomId);
+    });
+
+    socket.on('disconnect', () => {
+        const roomId = socketRoomMap[socket.id];
+        if (roomId && rooms[roomId]) {
+            const room = rooms[roomId];
+            room.players = room.players.filter(p => p.id !== socket.id);
+            if (room.players.filter(p => !p.isBot).length === 0) {
+                if(room.timer) clearTimeout(room.timer);
+                delete rooms[roomId];
+            }
+        }
+        delete socketRoomMap[socket.id];
     });
 });
 
