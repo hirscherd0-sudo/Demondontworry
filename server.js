@@ -10,11 +10,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
 const socketRoomMap = {};
-const TURN_TIMEOUT = 20000;
+const TURN_TIMEOUT = 25000;
 
 function generateTrapFields() {
     const traps = [];
-    // Sichere Felder: Start (0,10,20,30) + Felder davor/danach und Safe-Zones
     const safeZones = [0, 10, 20, 30, 9, 19, 29, 39, 1, 11, 21, 31]; 
     while(traps.length < 8) {
         const r = Math.floor(Math.random() * 40);
@@ -46,7 +45,7 @@ function nextTurn(roomId) {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (roomId) => {
-        // Aufräumen falls leer
+        // Aufräumen
         if (rooms[roomId] && rooms[roomId].players.filter(p => !p.isBot).length === 0) {
             delete rooms[roomId];
         }
@@ -90,7 +89,6 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
         if(!room || room.host !== socket.id) return;
 
-        // Bots auffüllen
         const colors = ['red', 'blue', 'green', 'yellow'];
         const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
         while(room.players.length < 4) {
@@ -101,8 +99,11 @@ io.on('connection', (socket) => {
         room.status = 'playing';
         io.to(roomId).emit('gameStarted', { players: room.players, trapFields: room.trapFields });
         
-        room.turnIndex = -1;
-        nextTurn(roomId);
+        // WICHTIG: Verzögerung damit Clients laden können
+        setTimeout(() => {
+            room.turnIndex = -1;
+            nextTurn(roomId);
+        }, 1000);
     });
 
     socket.on('rollDice', ({ roomId }) => {
