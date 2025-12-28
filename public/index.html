@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo Fixed</title>
+    <title>Horror Ludo Reparatur</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
 
         body { margin: 0; overflow: hidden; background-color: #000; color: #eee; font-family: 'Roboto', sans-serif; }
 
-        /* LAYER 0: GAME */
-        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 0; }
+        /* WICHTIG: Canvas muss existieren und ganz hinten sein */
+        #game-canvas {
+            display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0;
+        }
 
-        /* LAYER 1: HUD (Klicks gehen durch wo keine Buttons sind) */
         #hud-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: none;
@@ -22,29 +23,29 @@
         .hud-panel {
             background: rgba(20, 0, 0, 0.9); border: 2px solid #880000;
             padding: 10px 20px; margin: 20px; border-radius: 8px; 
-            pointer-events: auto; /* Panel blockt klicks */
+            pointer-events: auto;
         }
 
         .top-bar { display: flex; justify-content: space-between; }
         .bottom-bar { display: flex; justify-content: center; padding-bottom: 40px; pointer-events: auto; }
 
-        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; }
+        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; font-size: 1.5rem;}
         #timer-box { font-size: 3rem; color: red; font-weight: bold; text-align: right; text-shadow: 0 0 10px red; }
         
         #status-msg {
-            background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 20px;
+            background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 20px;
             font-size: 1.5rem; border: 1px solid #444; margin-bottom: 10px; text-align: center;
+            color: #fff; text-shadow: 1px 1px 0 #000;
         }
 
         .btn-horror {
             background: #880000; color: white; border: 2px solid #ff0000;
             padding: 15px 40px; font-size: 1.5rem; font-family: 'Creepster', cursive;
-            cursor: pointer; pointer-events: auto; box-shadow: 0 0 15px red;
+            cursor: pointer; pointer-events: auto; box-shadow: 0 0 15px red; border-radius: 8px;
         }
         .btn-horror:hover { background: #aa0000; transform: scale(1.05); }
         .btn-horror:disabled { background: #333; border-color: #555; color: #777; box-shadow: none; transform: none; cursor: default;}
 
-        /* LAYER 2: OVERLAYS (Login, Lobby) */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(5, 0, 0, 0.98); z-index: 20;
@@ -55,7 +56,7 @@
 
         input { padding: 15px; font-size: 1.2rem; background: #222; color: white; border: 1px solid #555; margin-bottom: 20px; text-align: center; }
         
-        .quiz-opt { background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; }
+        .quiz-opt { background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; text-align: left; }
         .quiz-opt:hover { border-color: red; background: #440000; }
 
     </style>
@@ -64,6 +65,9 @@
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
+
+    <!-- CANVAS FEST INTEGRIERT -->
+    <canvas id="game-canvas"></canvas>
 
     <!-- HUD -->
     <div id="hud-layer">
@@ -81,7 +85,7 @@
         </div>
         <div class="bottom-bar">
             <div style="text-align:center;">
-                <div id="status-msg">Warte auf Start...</div>
+                <div id="status-msg">Warte auf Spielstart...</div>
                 <button id="btn-action" class="btn-horror" style="display:none;" onclick="game.roll()">WÜRFELN</button>
             </div>
         </div>
@@ -139,7 +143,6 @@
             document.getElementById('lobby-list').innerHTML = data.players.map(p => 
                 `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
             ).join('');
-            
             if(data.hostId === socket.id) {
                 const btn = document.getElementById('btn-start');
                 btn.disabled = false; btn.innerText = "STARTEN";
@@ -148,6 +151,8 @@
 
         socket.on('gameStarted', data => {
             document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('status-msg').innerText = "Spiel wird geladen...";
+            // Initialisiere Spiel sofort
             if(!game) game = new Game3D(data);
         });
 
@@ -159,17 +164,19 @@
             constructor(data) {
                 this.players = data.players;
                 this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x050505); // Fast schwarz
+                this.scene.background = new THREE.Color(0x050505);
                 
                 this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 50, 40);
+                this.camera.position.set(0, 55, 45); // Kamera etwas höher
                 this.camera.lookAt(0,0,0);
 
-                this.renderer = new THREE.WebGLRenderer({antialias:true});
+                // NUTZE VORHANDENES CANVAS
+                const canvas = document.getElementById('game-canvas');
+                this.renderer = new THREE.WebGLRenderer({antialias:true, canvas: canvas});
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                document.body.appendChild(this.renderer.domElement); // WICHTIG: Fügt Canvas hinzu
-
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+                
+                // Licht
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
                 const dir = new THREE.DirectionalLight(0xffffff, 0.8);
                 dir.position.set(20,50,20); dir.castShadow=true;
                 this.scene.add(dir);
@@ -181,8 +188,9 @@
 
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.raycaster = new THREE.Raycaster();
-                // Click Listener auf Canvas
-                this.renderer.domElement.addEventListener('click', e => this.click(e));
+                
+                // Click Event
+                canvas.addEventListener('click', e => this.click(e));
 
                 this.active = {};
                 this.rolled = null;
@@ -217,6 +225,7 @@
                         document.getElementById('status-msg').style.color = "#fff";
                         btn.style.display = 'none';
                     }
+                    // Bot logic
                     if(d.isBot && myData.isHost) setTimeout(()=>socket.emit('rollDice', {roomId:document.getElementById('room-input').value}), 1500);
                 });
 
@@ -354,16 +363,16 @@
                 this.mesh=new THREE.Group(); this.mesh.userData={p:this};
                 const mat = new THREE.MeshStandardMaterial({color:COLORS[c]});
                 
-                if(c==='red') { // Puppe
+                if(c==='red') { 
                     this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7,1.5,16), mat).translateY(0.75));
                     this.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color:0xffcccc})).translateY(1.6));
-                } else if(c==='blue') { // Kreuz
+                } else if(c==='blue') { 
                     this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.4,2,0.3), mat).translateY(1));
                     this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1.4,0.3,0.3), mat).translateY(1.3));
-                } else if(c==='green') { // Stein
+                } else if(c==='green') { 
                     this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.4), mat).translateY(0.75));
                     this.mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.4,16), mat).rotateX(Math.PI/2).translateY(1.5));
-                } else { // Geist
+                } else { 
                     const gm = new THREE.MeshStandardMaterial({color:COLORS[c], transparent:true, opacity:0.7});
                     this.mesh.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5,1,4,8), gm).translateY(1));
                 }
@@ -385,13 +394,11 @@
         class Board {
             constructor(s,t) { this.s=2.5; this.traps=t; this.mk(); }
             mk() {
-                // Boden
                 const p = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x221111}));
                 p.position.y=-0.6; p.receiveShadow=true; this.s.add(p);
                 
                 for(let i=0; i<40; i++) {
                     let col = this.traps.includes(i) ? 0xaa00aa : 0x444444;
-                    // Startfelder Farben
                     if(i===0) col=COLORS.red; if(i===10) col=COLORS.blue; if(i===20) col=COLORS.green; if(i===30) col=COLORS.yellow;
                     
                     const m = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.2,2.3), new THREE.MeshStandardMaterial({color:col}));
@@ -406,7 +413,6 @@
                     const b = new THREE.Mesh(new THREE.CylinderGeometry(5,5,0.2,32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
                     b.position.set(x,0.1,z); this.s.add(b);
                 });
-                // Safe Zones visualisieren
                 for(let s=1; s<=4; s++) {
                     this.safe('red',s,0); this.safe('blue',s,1); this.safe('green',s,2); this.safe('yellow',s,3);
                 }
