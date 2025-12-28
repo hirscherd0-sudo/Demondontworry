@@ -9,23 +9,18 @@ const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
-
-// Konstante für Timer
-const TURN_TIME_LIMIT = 10000; // 10 Sekunden
+const TURN_TIMEOUT = 10000; // 10 Sekunden
 
 function generateTrapFields() {
     const traps = [];
     const safeZones = [0, 10, 20, 30]; 
     while(traps.length < 8) {
         const r = Math.floor(Math.random() * 40);
-        if(!traps.includes(r) && !safeZones.includes(r)) {
-            traps.push(r);
-        }
+        if(!traps.includes(r) && !safeZones.includes(r)) traps.push(r);
     }
     return traps;
 }
 
-// Hilfsfunktion: Zugwechsel mit Timer
 function nextTurn(roomId) {
     const room = rooms[roomId];
     if(!room) return;
@@ -35,27 +30,21 @@ function nextTurn(roomId) {
 
     // Nächster Spieler
     room.turnIndex = (room.turnIndex + 1) % 4;
-    
-    // Checken ob Slot belegt ist (falls Spieler rausgehen), sonst überspringen
-    // (Vereinfacht: Wir nehmen an, Slots sind fix durch Bots oder Spieler belegt)
-
     const activePlayer = room.players[room.turnIndex];
 
+    // Info an alle senden
     io.to(roomId).emit('turnChanged', { 
         activeColor: activePlayer.color,
-        isBot: activePlayer.isBot,
-        timeoutDuration: TURN_TIME_LIMIT
+        activePlayerId: activePlayer.id,
+        activeName: activePlayer.name,
+        isBot: activePlayer.isBot
     });
 
-    // Neuen Timer starten (Server Authority)
+    // Neuen Timer starten (Nur fürs Würfeln)
     room.timer = setTimeout(() => {
-        // Zeit abgelaufen!
-        io.to(roomId).emit('timeoutOccurred', { 
-            message: `Zeit abgelaufen für ${activePlayer.name}!` 
-        });
-        // Nächster dran
+        io.to(roomId).emit('statusMessage', { msg: `Zeit abgelaufen für ${activePlayer.name}!` });
         nextTurn(roomId);
-    }, TURN_TIME_LIMIT);
+    }, TURN_TIMEOUT);
 }
 
 io.on('connection', (socket) => {
@@ -67,7 +56,7 @@ io.on('connection', (socket) => {
                 status: 'waiting',
                 host: socket.id,
                 trapFields: generateTrapFields(),
-                turnIndex: -1, // Startet bei Spielbeginn
+                turnIndex: -1,
                 timer: null
             };
         }
@@ -79,25 +68,26 @@ io.on('connection', (socket) => {
         }
 
         if (room.players.length < 4) {
-            const colors = ['red', 'blue', 'green', 'yellow']; 
+            const colors = ['red', 'blue', 'green', 'yellow'];
             const playerColor = colors[room.players.length];
+            const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
             
             const player = {
                 id: socket.id,
                 color: playerColor,
                 isBot: false,
-                name: `Spieler ${room.players.length + 1}`
+                name: `Spieler ${room.players.length + 1}`,
+                figure: figures[playerColor]
             };
             room.players.push(player);
 
-            io.to(roomId).emit('lobbyUpdate', {
-                players: room.players,
-                isHost: room.host === socket.id,
-                hostId: room.host
-            });
+            // Update Lobby
+            io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
 
-            socket.emit('joinedLobby', { 
+            // Identität an den neuen Spieler senden
+            socket.emit('setIdentity', { 
                 color: playerColor, 
+                figure: figures[playerColor],
                 isHost: room.host === socket.id 
             });
         }
@@ -109,13 +99,16 @@ io.on('connection', (socket) => {
 
         // Bots auffüllen
         const colors = ['red', 'blue', 'green', 'yellow'];
+        const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
+        
         while(room.players.length < 4) {
-            const nextColor = colors[room.players.length];
+            const c = colors[room.players.length];
             room.players.push({
-                id: 'BOT_' + Date.now() + Math.random(),
-                color: nextColor,
+                id: 'BOT_' + Math.random(),
+                color: c,
                 isBot: true,
-                name: 'Horror Bot'
+                name: 'Bot ' + figures[c],
+                figure: figures[c]
             });
         }
 
@@ -125,40 +118,34 @@ io.on('connection', (socket) => {
             trapFields: room.trapFields
         });
 
-        // Ersten Zug starten
-        room.turnIndex = -1; // Damit nextTurn auf 0 springt
+        // Starten
+        room.turnIndex = -1;
         nextTurn(roomId);
     });
 
     socket.on('rollDice', ({ roomId }) => {
         const room = rooms[roomId];
         if(!room) return;
-
-        // Timer stoppen, da Aktion erfolgt ist
-        if(room.timer) clearTimeout(room.timer);
-
-        const val = Math.floor(Math.random() * 6) + 1;
-        io.to(roomId).emit('diceRolled', { 
-            playerId: socket.id, 
-            value: val 
-        });
         
-        // Timer wird NICHT neu gestartet. Wir warten auf 'movePiece' oder 'endTurn'.
-        // Damit man nicht ewig wartet, könnte man hier einen "Move Timer" starten.
-        // Für dieses Beispiel lassen wir den Move Timer weg, da der Roll Timer das wichtigste war.
+        // Timer stoppen, da gewürfelt wurde
+        if(room.timer) clearTimeout(room.timer);
+        
+        const val = Math.floor(Math.random() * 6) + 1;
+        io.to(roomId).emit('diceRolled', { playerId: socket.id, value: val });
+        
+        // Optional: Move Timer starten, damit Spiel nicht hängt wenn einer nicht zieht
+        // (Für dieses Beispiel lassen wir es beim Würfeltimer)
     });
 
-    socket.on('movePiece', ({ roomId, pieceId, newPosition, isFinished }) => {
+    socket.on('movePiece', ({ roomId, pieceId, newPosition }) => {
         io.to(roomId).emit('pieceMoved', { 
             playerId: socket.id, 
             pieceId: pieceId, 
-            newPosition: newPosition,
-            isFinished: isFinished
+            newPosition: newPosition 
         });
     });
 
     socket.on('endTurn', ({ roomId }) => {
-        // Zug beenden und Timer für nächsten Spieler starten
         nextTurn(roomId);
     });
 });
