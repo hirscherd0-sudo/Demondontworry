@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo 3D</title>
+    <title>Horror Ludo - Kreuz Edition</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
 
@@ -15,7 +15,7 @@
         /* Screens */
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 10, 15, 0.95);
+            background: rgba(10, 10, 15, 0.98);
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             z-index: 20; pointer-events: auto;
         }
@@ -38,21 +38,25 @@
         #game-hud { display: none; }
         .info-panel {
             position: absolute; top: 20px; left: 20px; 
-            background: rgba(0, 0, 0, 0.7); padding: 15px; border: 1px solid #444; border-radius: 8px;
+            background: rgba(0, 0, 0, 0.8); padding: 15px; border: 1px solid #444; border-radius: 8px;
+            min-width: 250px;
         }
         #turn-indicator { font-size: 1.2rem; font-weight: bold; margin-top: 5px; }
+        #timer-display { 
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            font-family: 'Creepster', cursive; font-size: 4rem; color: #fff; text-shadow: 0 0 20px #cc0000;
+        }
 
-        /* Würfel Button (Unsichtbar über dem 3D Würfel oder als Fallback) */
+        /* Overlay Button als Fallback */
         #dice-overlay-btn {
             position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            background: rgba(0,0,0,0.8); border: 2px solid #fff; border-radius: 10px;
-            padding: 10px 30px; font-size: 1.5rem; display: none;
+            display: none;
         }
 
         /* Quiz */
         #quiz-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 100;
+            background: rgba(0,0,0,0.95); z-index: 100;
             display: none; align-items: center; justify-content: center; flex-direction: column;
         }
         .quiz-box {
@@ -76,7 +80,7 @@
         <!-- Start Screen -->
         <div id="login-screen" class="screen interactive">
             <h1>Horror Ludo</h1>
-            <input type="text" id="room-id" value="Friedhof1" placeholder="Raum Name">
+            <input type="text" id="room-id" value="Krypta1" placeholder="Raum Name">
             <button onclick="connectToLobby()">Grabkammer betreten</button>
         </div>
 
@@ -89,11 +93,12 @@
 
         <!-- HUD -->
         <div id="game-hud" class="interactive hidden">
+            <div id="timer-display">10</div>
             <div class="info-panel">
                 <div id="status-text" style="color:#ff6666">Warte auf Spielstart...</div>
                 <div id="turn-indicator">Am Zug: <span id="current-player-name">---</span></div>
             </div>
-            <button id="dice-overlay-btn" onclick="game.tryRollDice()">Klicken zum Würfeln</button>
+            <button id="dice-overlay-btn" onclick="game.tryRollDice()">WÜRFELN!</button>
         </div>
 
         <!-- Quiz -->
@@ -109,16 +114,14 @@
     <script>
         // --- GLOBALS ---
         const QUESTIONS = [
-            { q: "Wie heißt der Killer in 'Halloween'?", a: ["Michael Myers", "Jason", "Freddy", "Chucky"], c: 0 },
+            { q: "Wer ist der Killer in 'Halloween'?", a: ["Michael Myers", "Jason", "Freddy", "Chucky"], c: 0 },
             { q: "Wovor hat man Angst bei Arachnophobie?", a: ["Geister", "Spinnen", "Höhe", "Clowns"], c: 1 },
             { q: "Welches Item erkennt Geister in Phasmophobia?", a: ["EMF Reader", "Bibel", "Pistole", "Knoblauch"], c: 0 },
             { q: "Was passiert, wenn man 'Beetlejuice' 3x sagt?", a: ["Er verschwindet", "Er erscheint", "Man stirbt", "Nichts"], c: 1 },
-            { q: "Welche Farbe hat das Blut des Xenomorphs (Alien)?", a: ["Rot", "Grün (Säure)", "Schwarz", "Blau"], c: 1 },
-            { q: "In welchem Film gibt es Regeln fürs Überleben?", a: ["Scream", "Saw", "Zombieland", "The Ring"], c: 2 },
+            { q: "Welche Farbe hat das Blut des Xenomorphs?", a: ["Rot", "Grün", "Schwarz", "Blau"], c: 1 },
             { q: "Wie heißt der Clown aus 'ES'?", a: ["Pennywise", "Krusty", "Joker", "Pogo"], c: 0 },
             { q: "Welches Datum ist unglücklich?", a: ["Freitag der 13.", "Montag der 1.", "Samstag der 14.", "Halloween"], c: 0 },
-            { q: "Was ist ein Poltergeist?", a: ["Ein lauter Geist", "Ein netter Geist", "Ein Dämon", "Ein Vampir"], c: 0 },
-            { q: "Wie tötet man Zombies am effektivsten?", a: ["Kopfschuss/Zerstörung des Gehirns", "Herzstich", "Verbrennen", "Weihwasser"], c: 0 }
+            { q: "Was ist ein Poltergeist?", a: ["Ein lauter Geist", "Ein netter Geist", "Ein Dämon", "Ein Vampir"], c: 0 }
         ];
 
         const COLORS = {
@@ -126,8 +129,6 @@
             blue: 0x0000aa,   // Kreuze
             green: 0x005500,  // Grabsteine
             yellow: 0xdddd00, // Geister
-            path: 0x444444,
-            trap: 0x880088
         };
 
         const socket = io();
@@ -161,7 +162,6 @@
                 </div>`
             ).join('');
             
-            // Fülle leere Slots visuell auf
             for(let i=players.length; i<4; i++) {
                 list.innerHTML += `<div style="padding:5px; border-bottom:1px solid #333; color:#555; font-style:italic;">...Leer (wird Bot)...</div>`;
             }
@@ -193,110 +193,68 @@
         class Dice3D {
             constructor(scene) {
                 this.mesh = this.createDiceMesh();
-                this.mesh.position.set(0, 2, 0); // Schwebend in der Mitte
+                this.mesh.position.set(0, 3, 0); 
+                // userData für Raycaster
+                this.mesh.userData = { isDice: true }; 
                 scene.add(this.mesh);
                 this.isRolling = false;
-                this.targetRotation = null;
             }
 
             createDiceMesh() {
-                // Wir nutzen Canvas Texturen für die Augen
-                const size = 2;
+                const size = 2.5; // Etwas größer
                 const geo = new THREE.BoxGeometry(size, size, size);
                 const mats = [];
-                
-                // Würfelseiten Mapping (Standard W6)
-                // 1=Right, 2=Left, 3=Top, 4=Bottom, 5=Front, 6=Back (ThreeJS order varies, we use simple mapping)
-                // ThreeJS Box materials order: right, left, top, bottom, front, back
                 const numbers = [1, 2, 3, 4, 5, 6]; 
                 
                 numbers.forEach(n => {
                     const canvas = document.createElement('canvas');
                     canvas.width = 128; canvas.height = 128;
                     const ctx = canvas.getContext('2d');
-                    
-                    // Hintergrund (Knochenfarben)
-                    ctx.fillStyle = '#f0e68c';
-                    ctx.fillRect(0,0,128,128);
-                    
-                    // Rand
-                    ctx.strokeStyle = '#8b4513';
-                    ctx.lineWidth = 10;
-                    ctx.strokeRect(0,0,128,128);
-
-                    // Augen (Punkte)
-                    ctx.fillStyle = 'black';
+                    ctx.fillStyle = '#f0e68c'; ctx.fillRect(0,0,128,128);
+                    ctx.strokeStyle = '#5c0000'; ctx.lineWidth = 15; ctx.strokeRect(0,0,128,128);
+                    ctx.fillStyle = '#5c0000'; // Blutrote Punkte
                     this.drawDots(ctx, n);
-
-                    const tex = new THREE.CanvasTexture(canvas);
-                    mats.push(new THREE.MeshStandardMaterial({ map: tex }));
+                    mats.push(new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas) }));
                 });
-
                 return new THREE.Mesh(geo, mats);
             }
 
             drawDots(ctx, n) {
-                const r = 12;
-                const m = 64; // Mitte
-                const l = 32; // Links/Oben
-                const h = 96; // Rechts/Unten
-                
-                if(n%2 !== 0) { ctx.beginPath(); ctx.arc(m, m, r, 0, Math.PI*2); ctx.fill(); } // Mitte (1,3,5)
-                if(n>1) { 
-                    ctx.beginPath(); ctx.arc(l, l, r, 0, Math.PI*2); ctx.fill(); // Oben Links
-                    ctx.beginPath(); ctx.arc(h, h, r, 0, Math.PI*2); ctx.fill(); // Unten Rechts
-                }
-                if(n>3) {
-                    ctx.beginPath(); ctx.arc(h, l, r, 0, Math.PI*2); ctx.fill(); // Oben Rechts
-                    ctx.beginPath(); ctx.arc(l, h, r, 0, Math.PI*2); ctx.fill(); // Unten Links
-                }
-                if(n===6) {
-                    ctx.beginPath(); ctx.arc(l, m, r, 0, Math.PI*2); ctx.fill(); // Mitte Links
-                    ctx.beginPath(); ctx.arc(h, m, r, 0, Math.PI*2); ctx.fill(); // Mitte Rechts
-                }
+                const r = 14; const m = 64; const l = 32; const h = 96;
+                if(n%2 !== 0) { ctx.beginPath(); ctx.arc(m, m, r, 0, Math.PI*2); ctx.fill(); }
+                if(n>1) { ctx.beginPath(); ctx.arc(l, l, r, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(h, h, r, 0, Math.PI*2); ctx.fill(); }
+                if(n>3) { ctx.beginPath(); ctx.arc(h, l, r, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(l, h, r, 0, Math.PI*2); ctx.fill(); }
+                if(n===6) { ctx.beginPath(); ctx.arc(l, m, r, 0, Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(h, m, r, 0, Math.PI*2); ctx.fill(); }
             }
 
             roll(value, callback) {
                 this.isRolling = true;
-                const duration = 1000;
+                const duration = 800;
                 const start = Date.now();
-                
-                // Zielrotation basierend auf Material Index (Right, Left, Top, Bottom, Front, Back) -> (1, 2, 3, 4, 5, 6)
-                // Wir müssen rotieren, damit die richtige Seite OBEN ist (Y-Achse positiv)
-                // Top (Index 2, Value 3) ist default oben.
                 let target = new THREE.Vector3(0,0,0);
                 
-                // Mapping Value -> Rotation to make it face UP
+                // Rotation damit Zahl oben ist (Mapping angepasst)
                 switch(value) {
-                    case 1: target.set(0, 0, Math.PI/2); break; // Right Seite nach oben
-                    case 2: target.set(0, 0, -Math.PI/2); break; // Left Seite nach oben
-                    case 3: target.set(0, 0, 0); break; // Top ist schon oben
-                    case 4: target.set(Math.PI, 0, 0); break; // Bottom nach oben (180 flip)
-                    case 5: target.set(-Math.PI/2, 0, 0); break; // Front nach oben
-                    case 6: target.set(Math.PI/2, 0, 0); break; // Back nach oben
+                    case 1: target.set(0, 0, Math.PI/2); break; 
+                    case 2: target.set(0, 0, -Math.PI/2); break;
+                    case 3: target.set(0, 0, 0); break;
+                    case 4: target.set(Math.PI, 0, 0); break;
+                    case 5: target.set(-Math.PI/2, 0, 0); break;
+                    case 6: target.set(Math.PI/2, 0, 0); break;
                 }
-
-                // Add random full rotations
-                target.x += Math.PI * 4;
-                target.y += Math.PI * 4;
+                target.x += Math.PI * 4; target.y += Math.PI * 4;
 
                 const animate = () => {
                     const now = Date.now();
                     const progress = Math.min((now - start) / duration, 1);
-                    
-                    // Ease out
                     const ease = 1 - Math.pow(1 - progress, 3);
-                    
                     this.mesh.rotation.x = target.x * ease;
                     this.mesh.rotation.y = target.y * ease;
                     this.mesh.rotation.z = target.z * ease;
-                    
-                    // Wackeln
-                    this.mesh.position.y = 2 + Math.sin(progress * Math.PI * 10) * 0.5;
+                    this.mesh.position.y = 3 + Math.sin(progress * Math.PI * 8) * 1;
 
-                    if(progress < 1) {
-                        requestAnimationFrame(animate);
-                    } else {
+                    if(progress < 1) requestAnimationFrame(animate);
+                    else {
                         this.isRolling = false;
                         if(callback) callback();
                     }
@@ -314,7 +272,6 @@
                 this.meshGroup = new THREE.Group();
                 this.scene = scene;
 
-                // WICHTIG: Hier unterscheiden wir die Geometrie basierend auf der Farbe
                 if(color === 'red') this.createDoll();
                 else if(color === 'green') this.createTombstone();
                 else if(color === 'blue') this.createCross();
@@ -325,100 +282,378 @@
                 this.updatePositionVisuals(true);
             }
 
-            // ROT: Puppe
             createDoll() {
-                const matDress = new THREE.MeshStandardMaterial({ color: 0xaa0000 }); // Dunkelrot
-                const matSkin = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
-                
+                const matDress = new THREE.MeshStandardMaterial({ color: 0x880000 });
                 const dress = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.2, 16), matDress);
                 dress.position.y = 0.6;
                 this.meshGroup.add(dress);
-                
-                const head = new THREE.Mesh(new THREE.SphereGeometry(0.35), matSkin);
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshStandardMaterial({ color: 0xdddddd }));
                 head.position.y = 1.4;
                 this.meshGroup.add(head);
-
-                // Zöpfe
-                const hair = new THREE.Mesh(new THREE.SphereGeometry(0.15), new THREE.MeshStandardMaterial({color:0xffaa00}));
-                const h1 = hair.clone(); h1.position.set(-0.3, 1.5, 0);
-                const h2 = hair.clone(); h2.position.set(0.3, 1.5, 0);
-                this.meshGroup.add(h1, h2);
             }
 
-            // GRÜN: Grabstein
             createTombstone() {
-                const mat = new THREE.MeshStandardMaterial({ color: 0x556655, roughness: 0.9 });
-                const geo = new THREE.BoxGeometry(0.8, 1.2, 0.3);
-                // Oben abrunden (simuliert durch Skalierung oder zusätzlichen Zylinder)
-                const stone = new THREE.Mesh(geo, mat);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x445544, roughness: 1 });
+                const stone = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.3), mat);
                 stone.position.y = 0.6;
                 this.meshGroup.add(stone);
-                
                 const top = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16), mat);
-                top.rotation.x = Math.PI / 2;
-                top.position.y = 1.2;
+                top.rotation.x = Math.PI / 2; top.position.y = 1.2;
                 this.meshGroup.add(top);
-                
-                const text = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.35), new THREE.MeshStandardMaterial({color:0x000000}));
-                text.position.set(0, 0.8, 0);
-                this.meshGroup.add(text); // "R.I.P" Balken
             }
 
-            // BLAU: Kreuz
             createCross() {
-                const mat = new THREE.MeshStandardMaterial({ color: 0x3333aa, roughness: 0.7 }); // Blaues Holz/Stein
-                
-                const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.5, 0.3), mat);
-                vertical.position.y = 0.75;
-                this.meshGroup.add(vertical);
-                
-                const horizontal = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 0.3), mat);
-                horizontal.position.y = 1.0;
-                this.meshGroup.add(horizontal);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x222288, roughness: 0.8 });
+                const v = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.5, 0.3), mat); v.position.y = 0.75;
+                const h = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 0.3), mat); h.position.y = 1.0;
+                this.meshGroup.add(v, h);
             }
 
-            // GELB: Geist
             createGhost() {
-                const mat = new THREE.MeshStandardMaterial({ color: 0xffffaa, transparent: true, opacity: 0.8 });
-                
-                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.0, 16), mat);
-                body.position.y = 0.5;
-                this.meshGroup.add(body);
-                
-                const head = new THREE.Mesh(new THREE.SphereGeometry(0.4), mat);
-                head.position.y = 1.1;
-                this.meshGroup.add(head);
-
-                // Augen
-                const eyes = new THREE.Mesh(new THREE.SphereGeometry(0.08), new THREE.MeshBasicMaterial({color:0x000000}));
-                const e1 = eyes.clone(); e1.position.set(-0.15, 1.1, 0.35);
-                const e2 = eyes.clone(); e2.position.set(0.15, 1.1, 0.35);
-                this.meshGroup.add(e1, e2);
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffaa, transparent: true, opacity: 0.9 });
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.6, 1.0, 16), mat); body.position.y = 0.5;
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.4), mat); head.position.y = 1.1;
+                this.meshGroup.add(body, head);
             }
 
             updatePositionVisuals(instant = false) {
                 let targetPos;
-                if(this.positionIndex === -1) {
-                    targetPos = this.board.getHomePosition(this.color, this.index);
-                } else {
-                    targetPos = this.board.getPositionForIndex(this.positionIndex, this.color);
-                }
+                if(this.positionIndex === -1) targetPos = this.board.getHomePosition(this.color, this.index);
+                else targetPos = this.board.getPositionForIndex(this.positionIndex, this.color);
 
-                if(instant) {
-                    this.meshGroup.position.copy(targetPos);
-                } else {
+                if(instant) this.meshGroup.position.copy(targetPos);
+                else {
                     const start = this.meshGroup.position.clone();
                     let alpha = 0;
                     const animate = () => {
                         alpha += 0.05;
                         if(alpha > 1) alpha = 1;
                         this.meshGroup.position.lerpVectors(start, targetPos, alpha);
-                        this.meshGroup.position.y = targetPos.y + Math.sin(alpha * Math.PI) * 2;
+                        this.meshGroup.position.y = targetPos.y + Math.sin(alpha * Math.PI) * 1.5;
                         if(alpha < 1) requestAnimationFrame(animate);
                         else this.meshGroup.position.y = targetPos.y;
                     };
                     animate();
                 }
+            }
+        }
+
+        class LudoBoard {
+            constructor(scene) {
+                this.scene = scene;
+                this.createEnvironment();
+                this.createVisuals();
+            }
+            
+            createEnvironment() {
+                const plane = new THREE.Mesh(new THREE.BoxGeometry(40, 1, 40), new THREE.MeshStandardMaterial({color:0x111111}));
+                plane.position.y = -0.5; plane.receiveShadow = true;
+                this.scene.add(plane);
+            }
+
+            // --- KREUZ LOGIK ---
+            // Wir definieren ein 11x11 Grid. Mitte ist (0,0). Feldgröße 2 Einheiten.
+            // Index 0 ist Start Rot. 
+            getCoordsForMapIndex(i) {
+                // Hardcodierter Pfad für ein perfektes Kreuz (Ausgehend von Rot unten rechts des Kreuzes)
+                // Dies ist der "Hauptpfad" Index 0 bis 39
+                
+                // Wir bauen die Koordinaten relativ auf. Einheit 2.5
+                // 0-4: Roter Arm, untere Zeile, nach rechts
+                // 5: Ecke rechts unten
+                // ... um das zu vereinfachen, nutzen wir eine Lookup-Tabelle für die 4 Arme
+                
+                // Arm-Definition (Startend vom Zentrum aus gesehen)
+                // Ein Arm ist 5 Felder lang.
+                
+                // Besser: Segment Logik
+                // Segment 0 (0-4): Rot Startgerade. Von (1, -5) bis (1, -1) -> FALSCH, Ludo geht raus
+                
+                // Klassisches Ludo:
+                // Start Rot (Index 0): Unter dem rechten Arm, erstes Feld.
+                // Wir definieren Koordinaten in einem virtuellen 11x11 Grid (0..10). 
+                // Mitte ist 5,5.
+                // Mapping Array für Index 0-39 (x, y im Grid)
+                const pathGrid = [
+                    // Rot Start (unten rechts vom Center, läuft nach rechts) -> eigentlich läuft es um den Arm
+                    // Arme haben Breite 3.
+                    // Rot Start: (6, 9) -> (6, 10)? Nein.
+                    
+                    // Wir nutzen Vektoren. Scale = 2.0
+                    // 0-4 (Start Rot, Vertikal hoch oder horizontal?)
+                    // Bei Ludo startet man auf dem eigenen Startfeld und läuft im Uhrzeigersinn.
+                    
+                    // Definiere Arme: Rechts, Unten, Links, Oben.
+                    // Rot ist meistens "Unten" oder "Rechts". Sagen wir Rot ist UNTEN.
+                    // Startfeld Rot ist (7, 10) im 11x11 Grid (wenn 0,0 Oben Links).
+                    // Aber wir machen es einfacher:
+                    
+                    // 0-3: Laufpfad von Start.
+                    // Wir generieren die Positionen algorithmisch basierend auf 4 Armen.
+                ];
+                
+                // Kreuz-Koordinaten (Zentrum 0,0, Feldabstand 2.2)
+                const S = 2.2;
+                
+                // Funktion um lokale Arm-Koordinaten in Welt zu rotieren
+                // Arm: 5 Felder Geradeaus, dann Ecke
+                // Wir definieren den Pfad für EINEN Spieler (0-9) und rotieren für den Rest.
+                
+                // Ein Viertel (10 Felder):
+                // 0-3: Auf dem Arm nach außen? Nein, Ludo läuft AM Arm entlang.
+                // 0-4: Rechte Spalte des unteren Arms (von unten nach oben)
+                // 5: Ecke (Mitte Rechts des unteren Arms? Nein)
+                
+                // Lass uns Koordinaten hardcoden für Index 0-9 (Ein Quadrant/Arm-Übergang)
+                // Wir nehmen an Rot startet bei Index 0.
+                // Position 0: x=2.2, z=6.6 (Rechts vom unteren Arm, start)
+                // 0->4: z wird kleiner (hoch laufen)
+                
+                let x = 0, z = 0;
+                const quadrant = Math.floor(i / 10);
+                const localIdx = i % 10;
+                
+                // Lokale Koordinaten für Segment (bevor Rotation)
+                // Wir simulieren den "Roten" Pfad (Startet Unten, geht hoch, dann rechts)
+                // Start (0): x=S, z=4*S. Wir laufen hoch bis z=0? Nein.
+                // Grid: Zentrum 0.
+                // Arme gehen bis 5 Einheiten raus.
+                // Pfad 0-4: x=S, z=(5*S) -> z=(S). (5 Schritte nach oben)
+                
+                let lx = 0, lz = 0;
+                
+                if (localIdx < 5) {
+                    // Die 5 Felder am Arm entlang Richtung Zentrum
+                    lx = S; 
+                    lz = (5 * S) - (localIdx * S); // 5S, 4S, 3S, 2S, 1S
+                    // Korrektur: Ludo Startfeld ist eigentlich das erste.
+                    // Sagen wir Index 0 ist Start. Pos: (S, 4S) -> (S, 0)?
+                    // Nein, wir müssen beim Nachbarn enden.
+                    
+                    // Um es visuell perfekt zu machen:
+                    // 0: (S, 4S)
+                    // 1: (S, 3S)
+                    // 2: (S, 2S)
+                    // 3: (S, S)
+                    // 4: (S, 0) -> FALSCH, das wäre im Center. Center ist Home.
+                    
+                    // Verschiebung: Wir nehmen an Arm ist 3 breit. Mitte ist 0.
+                    // Pfad ist bei x=S.
+                    // y Start ist bei 4*S. Ende bei 1*S?
+                    // Ja. (S, 5S) bis (S, S).
+                    lx = S;
+                    lz = (5 * S) - (localIdx * S); 
+                } else if (localIdx === 5) {
+                    // Die Ecke um in den nächsten Arm zu gehen
+                    // Von (S, S) nach (2S, 0)? Nein.
+                    // Nach (S, S) kommt (2S, S) -> dann nach draußen
+                    lx = 2 * S;
+                    lz = S;
+                } else {
+                    // localIdx 6-9 (4 Felder)
+                    // Den nächsten Arm entlang nach draußen
+                    // Start bei (2S, S). Nächster ist (3S, S)... (6S, S)
+                    // Laufvariable k = localIdx - 6 (0..3)
+                    const k = localIdx - 6;
+                    lx = (3 * S) + (k * S);
+                    lz = S; // Falsch, wir sind im rechten Arm...
+                    // Moment, wir rotieren das ganze ja.
+                    // Bleiben wir lokal im "Süd-Quadranten" logik, das passt nicht ganz.
+                }
+
+                // BESSERER WEG: Hardcoded Lookup für 0-9 (Ein Arm + Kurve)
+                // Annahme: Zentrum (0,0). Armbreite 3 Felder (-S, 0, S).
+                // 0: (S, 5S)  (Startfeld Rot)
+                // 1: (S, 4S)
+                // 2: (S, 3S)
+                // 3: (S, 2S)
+                // 4: (S, S)   (Innen am Center)
+                // 5: (2S, S)  (Ecke zum rechten Arm) -> Falsch, das wäre Diagonalsprung.
+                // Ludo geht: (S, S) -> (S, -S)? Nein, das geht durch Home.
+                // Es geht: (S, S) -> (2S, S) -> (3S, S) -> (4S, S) -> (5S, S) -> (5S, 0) -> (5S, -S) usw.
+                
+                // OK, definieren wir die 40 Felder explizit als Array von Vektoren für maximale Kontrolle.
+            }
+            
+            getVectorForIndex(i) {
+                // Skalierung
+                const S = 2.5; 
+                // Relativ zum Center 0,0
+                // Rot (Start) ist Index 0. Wir sagen Rot ist UNTEN (Positive Z), rechter Pfad (Positive X).
+                
+                // Wir bauen nur einen Quadranten und rotieren ihn.
+                // Ein Quadrant sind 10 Felder. 
+                // Pfad Startet Unten-Rechts vom Center, geht hoch, geht rechts raus, wendet, geht links rein.
+                // Index 0-9 sind:
+                // 0: (1, 5) -> Start
+                // 1: (1, 4)
+                // 2: (1, 3)
+                // 3: (1, 2)
+                // 4: (1, 1) -> Vor dem Center
+                // 5: (2, 1) -> Erster Schritt in rechten Arm
+                // 6: (3, 1)
+                // 7: (4, 1)
+                // 8: (5, 1) -> Ende Rechter Arm oben
+                // 9: (5, 0) -> Spitze Rechter Arm
+                // (Der nächste Index 10 ist dann (5, -1))
+                
+                let x=0, z=0;
+                const local = i % 10;
+                const arm = Math.floor(i / 10); // 0=Unten(Rot), 1=Rechts(Blau), 2=Oben(Grün), 3=Links(Gelb)
+
+                if(local <= 4) {
+                    x = 1; z = 5 - local;
+                } else if(local <= 8) {
+                    x = local - 3; z = 1;
+                } else { // 9
+                    x = 5; z = 0;
+                }
+                
+                // Vektor erstellen
+                let v = new THREE.Vector3(x*S, 0.2, z*S);
+                
+                // Rotieren basierend auf Arm
+                // Arm 0 (Rot): Bleibt wie definiert (Startet bei Z=5, X=1) -> Das ist "Unten Rechts" vom Center.
+                // Arm 1 (Blau): Muss 90 grad drehen.
+                
+                // Wir müssen die Basis Koordinaten (Quadrant 0) rotieren.
+                // Quadrant 0 Logik oben definiert: "Unten kommen, nach rechts abbiegen".
+                // Das passt für den Übergang von Unten nach Rechts.
+                
+                // Rotation um Zentrum (0,0)
+                // x' = x cos t - z sin t
+                // z' = x sin t + z cos t
+                const angle = -arm * (Math.PI / 2); // -90 Grad Schritte
+                const rx = v.x * Math.cos(angle) - v.z * Math.sin(angle);
+                const rz = v.x * Math.sin(angle) + v.z * Math.cos(angle);
+                
+                return new THREE.Vector3(rx, 0.2, rz);
+            }
+
+            createVisuals() {
+                // Felder
+                for(let i=0; i<40; i++) {
+                    const pos = this.getVectorForIndex(i);
+                    const isTrap = trapFields.includes(i);
+                    const isSafe = [0,10,20,30].includes(i);
+                    
+                    const mat = new THREE.MeshStandardMaterial({ 
+                        color: isTrap ? 0x8800cc : (isSafe ? 0x999999 : 0x555555),
+                        roughness: 0.6 
+                    });
+                    
+                    const tile = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 2.4), mat);
+                    tile.position.copy(pos);
+                    tile.position.y = 0.1;
+                    tile.receiveShadow = true;
+                    this.scene.add(tile);
+
+                    if(isTrap) {
+                        const q = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({color:0xff00ff}));
+                        q.position.set(pos.x, 1.0, pos.z);
+                        // Animation loop im main loop machen, hier nur adden
+                        this.scene.add(q);
+                    }
+                }
+                
+                // Start & Home Bases
+                this.createBase(10, 10, 'red');
+                this.createBase(10, -10, 'blue'); // Achtung: Rotation beachten
+                this.createBase(-10, -10, 'green');
+                this.createBase(-10, 10, 'yellow');
+                
+                // Home Paths (Die 4 Felder ins Ziel)
+                this.createHomePath('red', 0); // Unten
+                this.createHomePath('blue', 1); // Rechts
+                this.createHomePath('green', 2); // Oben
+                this.createHomePath('yellow', 3); // Links
+            }
+            
+            createHomePath(color, rotationSteps) {
+                const S = 2.5;
+                for(let i=1; i<=4; i++) {
+                    // Startet bei (0, 5) und geht rein zu (0, 1)? Nein.
+                    // Startet nach Index 9 (5, 0). Dann kommt (5, -1)...
+                    // Nein, Zielpfad zweigt bei (0, 5) ab?
+                    // Homepath ist in der Mitte des Arms. x=0, z=4..1
+                    
+                    let v = new THREE.Vector3(0, 0.2, (5-i)*S);
+                    const angle = -rotationSteps * (Math.PI / 2);
+                    const rx = v.x * Math.cos(angle) - v.z * Math.sin(angle);
+                    const rz = v.x * Math.sin(angle) + v.z * Math.cos(angle);
+                    
+                    const tile = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 2.4), new THREE.MeshStandardMaterial({color: COLORS[color]}));
+                    tile.position.set(rx, 0.15, rz);
+                    this.scene.add(tile);
+                }
+            }
+
+            createBase(x, z, c) {
+                // Platten in den Ecken
+                const m = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 0.2, 32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
+                // Koordinaten anpassen an Grid Skalierung (S=2.5) -> 4*S = 10 passt grob
+                // Richtig positionieren damit es hübsch aussieht
+                let fx = x > 0 ? 15 : -15;
+                let fz = z > 0 ? 15 : -15;
+                m.position.set(fx, 0.05, fz);
+                this.scene.add(m);
+            }
+            
+            getPositionForIndex(index, playerColor) {
+                // 0-39
+                // Offset berechnen
+                let offset = 0;
+                if(playerColor === 'blue') offset = 10;
+                if(playerColor === 'green') offset = 20;
+                if(playerColor === 'yellow') offset = 30;
+                
+                let effectiveIndex = (index + offset) % 40;
+                
+                if(index >= 40) {
+                    // Zielfelder logic (Mitte des Arms)
+                    const S = 2.5;
+                    const step = index - 40 + 1; // 1 bis 4
+                    // Rot Home: Z positiv, X=0. Von Außen (z=5S) nach Innen (z=S)
+                    // (0, 4S), (0, 3S), (0, 2S), (0, S)
+                    // Mapping: step 1 -> (0, 4S)
+                    
+                    let v = new THREE.Vector3(0, 0.2, (5-step)*S);
+                    
+                    // Rotieren
+                    let rot = 0;
+                    if(playerColor === 'blue') rot = 1;
+                    if(playerColor === 'green') rot = 2;
+                    if(playerColor === 'yellow') rot = 3;
+                    
+                    const angle = -rot * (Math.PI / 2);
+                    const rx = v.x * Math.cos(angle) - v.z * Math.sin(angle);
+                    const rz = v.x * Math.sin(angle) + v.z * Math.cos(angle);
+                    return new THREE.Vector3(rx, 0.2, rz);
+                }
+                
+                return this.getVectorForIndex(effectiveIndex);
+            }
+            
+            getHomePosition(playerColor, pieceIndex) {
+                // Auf den Base Plates
+                let bx = playerColor === 'red' || playerColor === 'yellow' ? 15 : -15; // XPositiv: Rot, Gelb? Nein.
+                // Rot: Unten (Pos Z), Rechts (Pos X)? 
+                // Meine Rotationslogik: 0=Rot=Unten, 1=Blau=Rechts...
+                // Base Rot ist bei (Pos X, Pos Z) -> Quadrant 4 in Mathe, aber hier (15, 15)
+                
+                // Check Rotation oben:
+                // Arm 0 (Rot) -> z=5 (Positiv). Also Unten.
+                // Base Rot sollte bei (15, 15) sein.
+                
+                let cx=0, cz=0;
+                if(playerColor === 'red') { cx=15; cz=15; }
+                if(playerColor === 'blue') { cx=15; cz=-15; } // Rechts (nach rotation -90 -> X wird Z, Z wird -X) -> (15, -15)
+                if(playerColor === 'green') { cx=-15; cz=-15; }
+                if(playerColor === 'yellow') { cx=-15; cz=15; }
+                
+                const ox = (pieceIndex % 2 === 0 ? -1.5 : 1.5);
+                const oz = (pieceIndex < 2 ? -1.5 : 1.5);
+                return new THREE.Vector3(cx + ox, 0.5, cz + oz);
             }
         }
 
@@ -432,8 +667,8 @@
                 this.turnColor = 'red';
                 this.rolledValue = null;
                 this.hasRolled = false;
-                this.isQuizActive = false;
                 this.dice = null;
+                this.timerInterval = null;
 
                 this.initThree();
                 this.board = new LudoBoard(this.scene);
@@ -445,9 +680,6 @@
                 
                 this.setupSocketListeners();
                 this.updateUI();
-
-                // Initial Bot Check
-                if(this.amIHost && this.players[0].isBot) setTimeout(() => this.botTurn(), 2000);
             }
 
             initThree() {
@@ -455,7 +687,7 @@
                 this.scene.background = new THREE.Color(0x222222);
 
                 this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 32, 25);
+                this.camera.position.set(0, 45, 30); // Steilerer Winkel für bessere Übersicht
                 this.camera.lookAt(0, 0, 0);
 
                 this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -463,8 +695,7 @@
                 this.renderer.shadowMap.enabled = true;
                 document.body.appendChild(this.renderer.domElement);
 
-                // Licht
-                const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+                const ambient = new THREE.AmbientLight(0xffffff, 0.6);
                 this.scene.add(ambient);
 
                 const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -472,9 +703,7 @@
                 dirLight.castShadow = true;
                 this.scene.add(dirLight);
 
-                // Würfel erstellen
                 this.dice = new Dice3D(this.scene);
-
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.animate();
             }
@@ -488,23 +717,35 @@
             }
 
             setupSocketListeners() {
+                socket.on('turnChanged', (data) => {
+                    this.turnColor = data.activeColor;
+                    this.hasRolled = false;
+                    this.rolledValue = null;
+                    this.updateUI();
+                    this.startTimer(10);
+                });
+
+                socket.on('timeoutOccurred', (data) => {
+                    // Alert nervt bei Timeout, lieber Status Text
+                    document.getElementById('status-text').innerText = data.message;
+                });
+
                 socket.on('diceRolled', (data) => {
-                    // Animation starten
+                    clearInterval(this.timerInterval); // Timer stopppen
+                    document.getElementById('timer-display').innerText = "-";
+                    
                     this.dice.roll(data.value, () => {
-                        // Nach Animation
                         if(data.playerId === socket.id) {
                             this.rolledValue = data.value;
                             this.hasRolled = true;
-                            // Update UI
-                            const btn = document.getElementById('dice-overlay-btn');
-                            btn.style.display = 'none';
-                            
-                            // Check ob Move möglich
                             const canMove = this.checkIfCanMove();
                             if(!canMove) setTimeout(() => socket.emit('endTurn', { roomId: this.roomId }), 1500);
-                            else document.getElementById('status-text').innerText = `Du hast eine ${data.value} gewürfelt. Ziehe!`;
+                            else {
+                                document.getElementById('status-text').innerText = `Du hast eine ${data.value} gewürfelt. Ziehe!`;
+                                document.getElementById('dice-overlay-btn').style.display = 'none';
+                            }
                         } else {
-                            document.getElementById('status-text').innerText = `${this.turnColor} hat eine ${data.value} gewürfelt.`;
+                            document.getElementById('status-text').innerText = `${this.turnColor} hat ${data.value} gewürfelt.`;
                         }
                     });
                 });
@@ -518,20 +759,21 @@
                         this.checkCollisions(piece);
                     }
                 });
-
-                socket.on('turnChanged', (data) => {
-                    this.turnColor = data.activeColor;
-                    this.hasRolled = false;
-                    this.rolledValue = null;
-                    this.updateUI();
-                    
-                    if(this.amIHost && data.isBot) {
-                        setTimeout(() => this.botTurn(), 1500);
-                    }
-                });
             }
 
-            // Wrapper für Board Logic
+            startTimer(seconds) {
+                if(this.timerInterval) clearInterval(this.timerInterval);
+                let timeLeft = seconds;
+                const display = document.getElementById('timer-display');
+                display.innerText = timeLeft;
+                
+                this.timerInterval = setInterval(() => {
+                    timeLeft--;
+                    display.innerText = timeLeft;
+                    if(timeLeft <= 0) clearInterval(this.timerInterval);
+                }, 1000);
+            }
+
             checkIfCanMove() {
                 return this.pieces.filter(p => p.color === this.myColor).some(p => 
                     (p.positionIndex === -1 && this.rolledValue === 6) || 
@@ -542,52 +784,26 @@
             tryRollDice() {
                 if(this.turnColor !== this.myColor || this.hasRolled || this.dice.isRolling) return;
                 socket.emit('rollDice', { roomId: this.roomId });
-                document.getElementById('dice-overlay-btn').style.display = 'none';
             }
 
-            botTurn() {
-                // Bot würfelt
-                socket.emit('rollDice', { roomId: this.roomId });
-                
-                // Wir hören auf das 'diceRolled' Event wie alle anderen auch.
-                // Aber wir brauchen eine Logik, die NACH der Animation greift.
-                // Da socket.on('diceRolled') die Animation triggert und wir keinen Callback dort injecten können 
-                // ohne den Code zu verkomplizieren, machen wir einen Timeout, der lang genug ist (Animation dauert 1s).
-                
-                setTimeout(() => {
-                    // Bot Move Logik muss serverseitig eigentlich validiert werden, aber hier simuliert der Host den Bot.
-                    // Wir müssen den 'diceRolled' Wert lesen. Da wir aber im 'diceRolled' Event Listener keine Variable
-                    // global für den Bot speichern, müssen wir tricksen oder besser:
-                    // Wir hören hier nicht. Wir lassen die Socket-Events die Arbeit machen.
-                    // ABER: Das Socket Event weiß nicht, dass es ein Bot ist, der danach ziehen muss.
-                    
-                    // Workaround für diese Struktur: Bot Logic direkt hier mit Verzögerung, 
-                    // unter der Annahme, dass diceRolled eingetroffen ist.
-                    // Echte Lösung: Dice Klasse speichert lastValue.
-                }, 1200);
-            }
-
-            // Erweiterung Socket Listener für Bot
-            // ... (Da diceRolled asynchron ist, ist Bot-Logic im Listener besser aufgehoben oder über Flags)
-            // Vereinfachung: Wir packen Bot-Logic in den diceRolled Listener (unten im Code, nicht sauber aber funktional)
-            
             onMouseClick(event) {
-                if(this.isQuizActive || !this.hasRolled || this.turnColor !== this.myColor) return;
-
+                // Raycast für Würfel und Figuren
                 const mouse = new THREE.Vector2(
                     (event.clientX / window.innerWidth) * 2 - 1,
                     -(event.clientY / window.innerHeight) * 2 + 1
                 );
                 this.raycaster.setFromCamera(mouse, this.camera);
                 
-                // Raycast auch gegen den Würfel (optional, wenn man draufklicken will zum würfeln)
+                // 1. Würfel Check
                 const intersectsDice = this.raycaster.intersectObject(this.dice.mesh);
-                if(intersectsDice.length > 0 && !this.hasRolled && !this.dice.isRolling) {
+                if(intersectsDice.length > 0) {
                     this.tryRollDice();
                     return;
                 }
 
-                // Figuren
+                // 2. Figuren Check (nur wenn schon gewürfelt)
+                if(!this.hasRolled || this.turnColor !== this.myColor) return;
+
                 const intersects = this.raycaster.intersectObjects(this.scene.children, true);
                 for(let hit of intersects) {
                     let obj = hit.object;
@@ -610,18 +826,11 @@
                     newPos = piece.positionIndex + this.rolledValue;
                     if(newPos > 43) return;
                 }
-
                 const r = this.getAbsoluteIndex(newPos, this.myColor);
-                
-                // Sende Move
                 socket.emit('movePiece', { roomId: this.roomId, pieceId: piece.index, newPosition: newPos, isFinished: newPos >= 40 });
-
-                // Quiz Check
-                if(trapFields.includes(r) && newPos < 40) {
-                    this.triggerQuiz(piece);
-                } else {
-                    this.finishTurnLogic();
-                }
+                
+                if(trapFields.includes(r) && newPos < 40) this.triggerQuiz(piece);
+                else this.finishTurnLogic();
             }
 
             getAbsoluteIndex(relIndex, color) {
@@ -635,54 +844,39 @@
             checkCollisions(movedPiece) {
                 if(movedPiece.positionIndex === -1 || movedPiece.positionIndex >= 40) return;
                 const absPos = this.getAbsoluteIndex(movedPiece.positionIndex, movedPiece.color);
-
                 this.pieces.forEach(p => {
                     if(p === movedPiece) return;
                     if(p.positionIndex === -1 || p.positionIndex >= 40) return;
-                    
                     const pAbs = this.getAbsoluteIndex(p.positionIndex, p.color);
                     if(absPos === pAbs) {
-                        // Kollision
-                        p.positionIndex = -1;
-                        p.updatePositionVisuals();
+                        p.positionIndex = -1; p.updatePositionVisuals();
                     }
                 });
             }
 
             triggerQuiz(piece) {
-                this.isQuizActive = true;
                 const modal = document.getElementById('quiz-modal');
                 const qText = document.getElementById('q-text');
                 const qOpts = document.getElementById('q-opts');
-                
                 const qIdx = Math.floor(Math.random() * QUESTIONS.length);
                 const qData = QUESTIONS[qIdx];
-                qText.innerText = qData.q;
-                qOpts.innerHTML = '';
-
+                qText.innerText = qData.q; qOpts.innerHTML = '';
                 qData.a.forEach((ans, i) => {
-                    const btn = document.createElement('div');
-                    btn.className = 'quiz-opt';
-                    btn.innerText = ans;
-                    btn.onclick = () => this.handleQuizAnswer(i === qData.c, piece, modal);
+                    const btn = document.createElement('div'); btn.className = 'quiz-opt'; btn.innerText = ans;
+                    btn.onclick = () => {
+                        modal.style.display = 'none';
+                        if(i === qData.c) {
+                            alert("Richtig! Noch mal würfeln.");
+                            this.hasRolled = false; document.getElementById('dice-overlay-btn').style.display = 'block';
+                        } else {
+                            alert("FALSCH! Zurück ins Haus!");
+                            socket.emit('movePiece', { roomId: this.roomId, pieceId: piece.index, newPosition: -1 });
+                            this.finishTurnLogic(false);
+                        }
+                    };
                     qOpts.appendChild(btn);
                 });
                 modal.style.display = 'flex';
-            }
-
-            handleQuizAnswer(isCorrect, piece, modal) {
-                modal.style.display = 'none';
-                this.isQuizActive = false;
-
-                if(isCorrect) {
-                    alert("Richtig! Du darfst nochmal würfeln.");
-                    this.hasRolled = false;
-                    document.getElementById('dice-overlay-btn').style.display = 'block';
-                } else {
-                    alert("FALSCH! Zurück ins Haus!");
-                    socket.emit('movePiece', { roomId: this.roomId, pieceId: piece.index, newPosition: -1 });
-                    this.finishTurnLogic(false);
-                }
             }
 
             finishTurnLogic(allowExtra = true) {
@@ -699,98 +893,25 @@
                 const pInfo = document.getElementById('current-player-name');
                 const btn = document.getElementById('dice-overlay-btn');
                 const status = document.getElementById('status-text');
-                
                 const pObj = this.players.find(p => p.color === this.turnColor);
                 const name = pObj ? pObj.name : this.turnColor;
                 pInfo.innerText = name + (pObj && pObj.isBot ? " (Bot)" : "");
                 pInfo.style.color = '#' + COLORS[this.turnColor].toString(16);
 
                 if(this.turnColor === this.myColor && !this.hasRolled) {
-                    status.innerText = "Du bist dran!";
+                    status.innerText = "DU BIST DRAN!";
                     btn.style.display = 'block';
+                    btn.innerText = "WÜRFELN";
                 } else {
                     status.innerText = `Warte auf ${name}...`;
                     btn.style.display = 'none';
                 }
             }
-            
+
             animate() {
                 requestAnimationFrame(() => this.animate());
                 this.controls.update();
                 this.renderer.render(this.scene, this.camera);
-            }
-        }
-        
-        // --- BOARD HELPER CLASS ---
-        class LudoBoard {
-            constructor(scene) {
-                this.scene = scene;
-                this.createEnvironment();
-                this.createVisuals();
-            }
-            createEnvironment() {
-                // Boden
-                const plane = new THREE.Mesh(new THREE.BoxGeometry(50, 1, 50), new THREE.MeshStandardMaterial({color:0x222222}));
-                plane.position.y = -0.5;
-                plane.receiveShadow = true;
-                this.scene.add(plane);
-            }
-            createVisuals() {
-                // Felder
-                for(let i=0; i<40; i++) {
-                    const pos = this.getPositionForIndex(i, 'red');
-                    const isTrap = trapFields.includes(i);
-                    const isSafe = [0,10,20,30].includes(i);
-                    const mat = new THREE.MeshStandardMaterial({ color: isTrap ? 0x8800cc : (isSafe?0x888888:0x555555) });
-                    const tile = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 1.2), mat);
-                    tile.position.copy(pos);
-                    tile.position.y = 0.1;
-                    tile.receiveShadow = true;
-                    this.scene.add(tile);
-
-                    if(isTrap) {
-                        const q = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshBasicMaterial({color:0xff00ff}));
-                        q.position.set(pos.x, 0.5, pos.z);
-                        this.scene.add(q);
-                    }
-                }
-                // Basen Visualisierung (einfache Platten)
-                this.createBase(10, 10, 'red');
-                this.createBase(-10, 10, 'blue');
-                this.createBase(-10, -10, 'green');
-                this.createBase(10, -10, 'yellow');
-            }
-            createBase(x, z, c) {
-                const m = new THREE.Mesh(new THREE.CylinderGeometry(3.5, 3.5, 0.1, 32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
-                m.position.set(x, 0.05, z);
-                this.scene.add(m);
-            }
-            getPositionForIndex(index, playerColor) {
-                const r = 8;
-                let offset = 0;
-                if(playerColor === 'blue') offset = 10;
-                if(playerColor === 'green') offset = 20;
-                if(playerColor === 'yellow') offset = 30;
-                let effectiveIndex = (index + offset) % 40;
-                if(index >= 40) {
-                    const step = index - 40 + 1;
-                    if(playerColor === 'red') return new THREE.Vector3(step*1.5, 0.2, 8);
-                    if(playerColor === 'blue') return new THREE.Vector3(-8, 0.2, step*1.5);
-                    if(playerColor === 'green') return new THREE.Vector3(-step*1.5, 0.2, -8);
-                    if(playerColor === 'yellow') return new THREE.Vector3(8, 0.2, -step*1.5);
-                }
-                const angle = (effectiveIndex / 40) * Math.PI * 2;
-                return new THREE.Vector3(Math.cos(angle)*r, 0.2, Math.sin(angle)*r);
-            }
-            getHomePosition(playerColor, pieceIndex) {
-                let bx=0, bz=0;
-                if(playerColor === 'red') { bx=10; bz=10; }
-                if(playerColor === 'blue') { bx=-10; bz=10; }
-                if(playerColor === 'green') { bx=-10; bz=-10; }
-                if(playerColor === 'yellow') { bx=10; bz=-10; }
-                const ox = (pieceIndex % 2 === 0 ? -1.2 : 1.2);
-                const oz = (pieceIndex < 2 ? -1.2 : 1.2);
-                return new THREE.Vector3(bx + ox, 0.5, bz + oz);
             }
         }
         
