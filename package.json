@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-redeemed",
-  "version": "6.6.6",
-  "description": "Horror Ludo - Stable Version",
+  "name": "horror-ludo-repair",
+  "version": "6.0.0",
+  "description": "Fixed Ludo Version",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
