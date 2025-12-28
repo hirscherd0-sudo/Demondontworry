@@ -8,15 +8,13 @@ const path = require('path');
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Speicher für Räume
 const rooms = {};
-const TURN_TIMEOUT = 20000; // 20 Sekunden (für 3x Würfeln)
 const socketRoomMap = {};
+const TURN_TIMEOUT = 20000;
 
 function generateTrapFields() {
     const traps = [];
-    // Startfelder (0, 10, 20, 30) sind sicher vor Fallen
-    const safeZones = [0, 10, 20, 30, 1, 11, 21, 31, 39, 9, 19, 29]; 
+    const safeZones = [0, 10, 20, 30, 1, 11, 21, 31, 39, 9, 19, 29];
     while(traps.length < 8) {
         const r = Math.floor(Math.random() * 40);
         if(!traps.includes(r) && !safeZones.includes(r)) traps.push(r);
@@ -27,7 +25,6 @@ function generateTrapFields() {
 function nextTurn(roomId) {
     const room = rooms[roomId];
     if(!room) return;
-
     if(room.timer) clearTimeout(room.timer);
 
     room.turnIndex = (room.turnIndex + 1) % room.players.length;
@@ -48,6 +45,7 @@ function nextTurn(roomId) {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (roomId) => {
+        // Cleanup alter leerer Räume
         if (rooms[roomId] && rooms[roomId].players.filter(p => !p.isBot).length === 0) {
             delete rooms[roomId];
         }
@@ -75,23 +73,16 @@ io.on('connection', (socket) => {
         if (room.players.length < 4) {
             const colors = ['red', 'blue', 'green', 'yellow'];
             const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
-            const playerColor = colors[room.players.length];
+            const c = colors[room.players.length];
             
-            const player = {
-                id: socket.id,
-                color: playerColor,
-                isBot: false,
-                name: `Spieler ${room.players.length + 1}`,
-                figure: figures[playerColor]
-            };
-            room.players.push(player);
+            const p = { id: socket.id, color: c, isBot: false, name: `Spieler ${room.players.length + 1}`, figure: figures[c] };
+            room.players.push(p);
 
+            // Sende Identität
+            socket.emit('setIdentity', { color: c, figure: figures[c], isHost: room.host === socket.id });
+            
+            // Update für alle (Host Status mitsenden)
             io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
-            socket.emit('setIdentity', { 
-                color: playerColor, 
-                figure: figures[playerColor],
-                isHost: room.host === socket.id 
-            });
         } else {
             socket.emit('errorMsg', 'Raum voll!');
         }
@@ -99,62 +90,59 @@ io.on('connection', (socket) => {
 
     socket.on('requestStartGame', (roomId) => {
         const room = rooms[roomId];
-        if(!room || room.host !== socket.id) return;
+        if(!room) return;
+        // Sicherheitscheck: Darf dieser User starten?
+        if(room.host !== socket.id) return;
 
+        // Bots auffüllen
         const colors = ['red', 'blue', 'green', 'yellow'];
         const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
-        
         while(room.players.length < 4) {
             const c = colors[room.players.length];
-            room.players.push({
-                id: 'BOT_' + Math.random(),
-                color: c,
-                isBot: true,
-                name: 'Bot (' + figures[c] + ')',
-                figure: figures[c]
-            });
+            room.players.push({ id: 'BOT_'+Math.random(), color: c, isBot: true, name: 'Bot '+figures[c], figure: figures[c] });
         }
 
         room.status = 'playing';
-        io.to(roomId).emit('gameStarted', {
-            players: room.players,
-            trapFields: room.trapFields
-        });
-
+        io.to(roomId).emit('gameStarted', { players: room.players, trapFields: room.trapFields });
+        
         room.turnIndex = -1;
         nextTurn(roomId);
     });
 
     socket.on('rollDice', ({ roomId }) => {
         const room = rooms[roomId];
-        if(!room) return;
-        // Timer nicht komplett resetten, damit man nicht ewig Zeit schindet, 
-        // aber wir vertrauen dem Client Flow.
-        
-        const val = Math.floor(Math.random() * 6) + 1;
-        io.to(roomId).emit('diceRolled', { playerId: socket.id, value: val });
+        if(room) {
+            if(room.timer) clearTimeout(room.timer);
+            io.to(roomId).emit('diceRolled', { playerId: socket.id, value: Math.floor(Math.random()*6)+1 });
+        }
     });
 
     socket.on('movePiece', ({ roomId, pieceId, newPosition }) => {
-        io.to(roomId).emit('pieceMoved', { 
-            playerId: socket.id, 
-            pieceId: pieceId, 
-            newPosition: newPosition 
-        });
+        io.to(roomId).emit('pieceMoved', { playerId: socket.id, pieceId, newPosition });
     });
 
-    socket.on('endTurn', ({ roomId }) => {
-        nextTurn(roomId);
-    });
+    socket.on('endTurn', ({ roomId }) => nextTurn(roomId));
 
     socket.on('disconnect', () => {
         const roomId = socketRoomMap[socket.id];
         if (roomId && rooms[roomId]) {
             const room = rooms[roomId];
             room.players = room.players.filter(p => p.id !== socket.id);
-            if (room.players.filter(p => !p.isBot).length === 0) {
-                if(room.timer) clearTimeout(room.timer);
-                delete rooms[roomId];
+            
+            // Host Migration: Wenn Host geht, wird der nächste echte Spieler Host
+            if (room.host === socket.id) {
+                const nextHuman = room.players.find(p => !p.isBot);
+                if (nextHuman) {
+                    room.host = nextHuman.id;
+                    io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
+                    // Informiere neuen Host
+                    const hostSocket = io.sockets.sockets.get(nextHuman.id);
+                    if(hostSocket) hostSocket.emit('youAreHost');
+                } else {
+                    delete rooms[roomId]; // Niemand mehr da
+                }
+            } else {
+                io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
             }
         }
         delete socketRoomMap[socket.id];
@@ -162,8 +150,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server läuft auf Port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server läuft auf ${PORT}`));
 
 
