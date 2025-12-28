@@ -3,160 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo Complete</title>
+    <title>Horror Ludo Fixed</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
 
-        body { margin: 0; overflow: hidden; font-family: 'Roboto', sans-serif; background-color: #050505; color: #eee; }
-        
-        /* UI LAYOUT */
+        body { margin: 0; overflow: hidden; background-color: #000; color: #eee; font-family: 'Roboto', sans-serif; }
+
+        /* LAYER 0: CANVAS (Wird per JS hinzugefügt) */
+        canvas {
+            display: block; position: absolute; top: 0; left: 0; z-index: 0;
+        }
+
+        /* LAYER 1: HUD (Spiel UI) */
         #hud-container {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; 
+            z-index: 10; pointer-events: none; /* Klicks gehen durch */
             display: flex; flex-direction: column; justify-content: space-between;
         }
 
         .hud-panel {
-            background: rgba(20, 0, 0, 0.9); border: 2px solid #660000;
-            padding: 10px 20px; margin: 20px; border-radius: 5px; pointer-events: auto;
-            box-shadow: 0 0 15px rgba(0,0,0,0.9);
+            background: rgba(20, 0, 0, 0.9); border: 2px solid #880000;
+            padding: 10px 20px; margin: 20px; border-radius: 5px; 
+            pointer-events: auto; /* UI klickbar */
+            box-shadow: 0 0 10px #000;
         }
 
-        .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
-        
-        #identity h2 { margin: 0; color: #fff; font-family: 'Creepster', cursive; letter-spacing: 1px; }
-        #turn-info { text-align: right; }
-        #timer-box { font-size: 4rem; font-weight: bold; color: #ff0000; text-shadow: 0 0 15px red; line-height: 1;}
+        .top-row { display: flex; justify-content: space-between; }
+        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; }
+        #timer-box { font-size: 3rem; color: red; font-weight: bold; text-align: right; text-shadow: 0 0 10px red; }
 
-        .bottom-row { display: flex; justify-content: center; padding-bottom: 30px; pointer-events: auto; }
-        
+        .bottom-row { display: flex; justify-content: center; padding-bottom: 40px; pointer-events: auto; }
         #status-msg { 
-            font-size: 1.4rem; margin-bottom: 15px; font-weight: bold; text-align: center;
-            text-shadow: 2px 2px 0 #000; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 10px;
+            background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 20px; 
+            font-size: 1.5rem; margin-bottom: 10px; text-align: center; border: 1px solid #444;
         }
 
         .btn-horror {
-            background: linear-gradient(to bottom, #990000, #550000);
-            border: 2px solid #ff3333; color: white;
-            padding: 20px 50px; font-size: 2rem;
-            font-family: 'Creepster', cursive; cursor: pointer;
-            border-radius: 8px; box-shadow: 0 0 30px rgba(255,0,0,0.5);
-            transition: transform 0.1s; display: block; margin: 0 auto;
+            background: #880000; color: white; border: 2px solid #ff0000;
+            padding: 15px 40px; font-size: 1.5rem; font-family: 'Creepster', cursive;
+            cursor: pointer; display: block; margin: 0 auto; box-shadow: 0 0 20px red;
         }
-        .btn-horror:hover { transform: scale(1.05); filter: brightness(1.2); }
+        .btn-horror:hover { background: #aa0000; transform: scale(1.05); }
+        .btn-horror:disabled { background: #333; border-color: #555; color: #777; box-shadow: none; transform: none; }
 
+        /* LAYER 2: OVERLAYS (Login, Lobby, Quiz) */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 0, 0, 0.96); z-index: 100;
+            background: rgba(5, 0, 0, 0.98); z-index: 100;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             pointer-events: auto;
         }
         .hidden { display: none !important; }
-        
-        input { padding: 15px; background: #222; border: 2px solid #666; color: white; text-align: center; font-size: 1.5rem; margin-bottom: 20px; width: 300px;}
+
+        input { padding: 10px; font-size: 1.2rem; text-align: center; background: #222; color: white; border: 1px solid #555; margin-bottom: 20px; }
         
         .quiz-opt {
-            background: #222; border: 1px solid #666; padding: 15px; margin: 10px; width: 400px;
-            cursor: pointer; transition: 0.2s; text-align: left; font-size: 1.2rem;
+            background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; text-align: left;
         }
-        .quiz-opt:hover { background: #550000; border-color: red; }
+        .quiz-opt:hover { border-color: red; background: #440000; }
+
     </style>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
+    <!-- HUD -->
     <div id="hud-container">
         <div class="top-row">
-            <div class="hud-panel" id="identity">
+            <div class="hud-panel">
                 <small style="color:#aaa">Du bist:</small>
-                <h2 id="my-name">Zuschauer</h2>
-                <div id="my-color-dot" style="width:100%; height:5px; background:grey; margin-top:5px;"></div>
+                <h2 id="my-name">---</h2>
+                <div id="my-dot" style="width:100%; height:5px; background:gray;"></div>
             </div>
-
-            <div class="hud-panel" id="turn-info">
+            <div class="hud-panel" style="text-align:right;">
                 <small style="color:#aaa">Am Zug:</small>
                 <h2 id="turn-name" style="color:gold">---</h2>
                 <div id="timer-box">20</div>
             </div>
         </div>
-
         <div class="bottom-row">
-            <div style="text-align:center;">
-                <div id="status-msg">Warte auf Spielstart...</div>
-                <button id="btn-action" class="btn-horror" style="display:none;" onclick="game.tryRollDice()">WÜRFELN</button>
+            <div>
+                <div id="status-msg">Warte auf Start...</div>
+                <button id="btn-action" class="btn-horror" style="display:none;" onclick="game.roll()">WÜRFELN</button>
             </div>
         </div>
     </div>
 
-    <!-- START SCREEN -->
+    <!-- LOGIN -->
     <div id="login-screen" class="overlay">
-        <h1 style="font-family: 'Creepster'; color: red; font-size: 5rem; margin-bottom: 10px;">Horror Ludo</h1>
-        <input type="text" id="room-id" value="Friedhof" placeholder="Raum Name">
-        <button class="btn-horror" onclick="connect()">Beitreten</button>
+        <h1 style="font-family:'Creepster'; font-size:5rem; color:red; margin:0;">HORROR LUDO</h1>
+        <p style="color:#aaa;">Wer überlebt die Nacht?</p>
+        <br>
+        <input type="text" id="room-input" placeholder="Raum Name">
+        <button class="btn-horror" onclick="join()">EINTRETEN</button>
     </div>
 
     <!-- LOBBY -->
     <div id="lobby-screen" class="overlay hidden">
-        <h1 style="color:red; font-family:'Creepster'">Warteraum</h1>
-        <div id="lobby-list" style="margin-bottom: 30px; font-size: 1.5rem; text-align:center;"></div>
-        <button id="btn-start" class="btn-horror" onclick="startGame()" disabled>Spiel Starten</button>
+        <h1 style="color:red; font-family:'Creepster'">Lobby</h1>
+        <div id="lobby-list" style="font-size:1.5rem; margin-bottom:30px;"></div>
+        <button id="btn-start" class="btn-horror" onclick="start()" disabled>WARTEN...</button>
     </div>
 
     <!-- QUIZ -->
     <div id="quiz-screen" class="overlay hidden">
-        <h2 style="color:red; font-family:'Creepster'; font-size:3rem;">Todesfrage</h2>
-        <p id="q-text" style="font-size:1.8rem; max-width:800px; text-align:center; margin-bottom:30px;">?</p>
+        <h2 style="color:red; font-family:'Creepster'">Todesfrage</h2>
+        <p id="q-text" style="font-size:1.5rem; margin-bottom:20px;">?</p>
         <div id="q-opts"></div>
     </div>
 
     <script>
-        document.getElementById('room-id').value = "Grab" + Math.floor(Math.random() * 1000);
+        document.getElementById('room-input').value = "Friedhof_" + Math.floor(Math.random()*1000);
         const socket = io();
-        
-        const COLORS = {
-            red: 0xaa0000,
-            blue: 0x0000aa,
-            green: 0x006600,
-            yellow: 0xdddd00
-        };
-        
+        const COLORS = { red: 0xaa0000, blue: 0x0000aa, green: 0x005500, yellow: 0xcccc00 };
         const QUESTIONS = [
-            { q: "Wer führte Regie bei 'Psycho'?", a: ["Hitchcock", "Spielberg", "Tarantino"], c: 0 },
-            { q: "Wie heißt der Killer in 'Scream'?", a: ["Ghostface", "Leatherface", "Pigface"], c: 0 },
-            { q: "Welches Tier ist Cujo?", a: ["Hund", "Katze", "Maus"], c: 0 },
-            { q: "Filmzitat: 'Ich sehe tote Menschen'", a: ["Sixth Sense", "The Others", "Ghost"], c: 0 },
-            { q: "Waffe von Freddy Krueger?", a: ["Klingenhandschuh", "Kettensäge", "Axt"], c: 0 }
+            {q:"Killer in Halloween?", a:["Michael","Jason","Freddy"], c:0},
+            {q:"Regisseur von Psycho?", a:["Hitchcock","Spielberg","Lucas"], c:0},
+            {q:"Angst vor Spinnen?", a:["Arachnophobie","Klaustrophobie","Agoraphobie"], c:0},
+            {q:"Clown in ES?", a:["Pennywise","Joker","Krusty"], c:0}
         ];
 
-        let myData = { color: null, figure: null, isHost: false };
+        let myData = { color:null, figure:null };
         let game = null;
 
-        function connect() {
-            const r = document.getElementById('room-id').value;
-            if(!r) return alert("Raumname fehlt!");
-            socket.emit('joinGame', r);
+        function join() {
+            const r = document.getElementById('room-input').value;
+            if(r) socket.emit('joinGame', r);
         }
-
-        function startGame() {
-            socket.emit('requestStartGame', document.getElementById('room-id').value);
+        function start() {
+            socket.emit('requestStartGame', document.getElementById('room-input').value);
         }
 
         socket.on('setIdentity', data => {
             myData = data;
             document.getElementById('my-name').innerText = data.figure;
             document.getElementById('my-name').style.color = '#' + COLORS[data.color].toString(16);
-            document.getElementById('my-color-dot').style.background = '#' + COLORS[data.color].toString(16);
+            document.getElementById('my-dot').style.background = '#' + COLORS[data.color].toString(16);
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('lobby-screen').classList.remove('hidden');
+        });
+
+        socket.on('youAreHost', () => {
+            // Falls Host wechselt während man in Lobby ist
+            const btn = document.getElementById('btn-start');
+            btn.disabled = false; btn.innerText = "STARTEN";
         });
 
         socket.on('lobbyUpdate', data => {
             document.getElementById('lobby-list').innerHTML = data.players.map(p => 
                 `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
             ).join('');
+            
             if(data.hostId === socket.id) {
                 const btn = document.getElementById('btn-start');
                 btn.disabled = false; btn.innerText = "STARTEN";
@@ -170,452 +169,306 @@
 
         socket.on('errorMsg', msg => alert(msg));
 
+
         // --- ENGINE ---
         class Game3D {
             constructor(data) {
                 this.players = data.players;
-                this.trapFields = data.trapFields;
-                
                 this.scene = new THREE.Scene();
                 this.scene.background = new THREE.Color(0x050505);
-                this.scene.fog = new THREE.FogExp2(0x050505, 0.015);
-
+                
                 this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
                 this.camera.position.set(0, 50, 40);
-                this.camera.lookAt(0, 0, 0);
+                this.camera.lookAt(0,0,0);
 
-                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer = new THREE.WebGLRenderer({antialias:true});
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.shadowMap.enabled = true;
+                // Canvas Styling explizit setzen
+                this.renderer.domElement.style.position = 'absolute';
+                this.renderer.domElement.style.top = '0';
+                this.renderer.domElement.style.left = '0';
+                this.renderer.domElement.style.zIndex = '0';
                 document.body.appendChild(this.renderer.domElement);
 
                 // Licht
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
                 const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-                dir.position.set(20, 60, 20); dir.castShadow = true;
-                dir.shadow.mapSize.width = 2048; dir.shadow.mapSize.height = 2048;
+                dir.position.set(20,50,20); dir.castShadow=true;
                 this.scene.add(dir);
-                
-                const redSpot = new THREE.PointLight(0xff0000, 0.5, 50);
-                redSpot.position.set(-20, 10, -20); this.scene.add(redSpot);
-                const blueSpot = new THREE.PointLight(0x0000ff, 0.5, 50);
-                blueSpot.position.set(20, 10, 20); this.scene.add(blueSpot);
 
-                this.board = new Board(this.scene, this.trapFields);
+                this.board = new Board(this.scene, data.trapFields);
                 this.dice = new Dice(this.scene);
                 this.pieces = [];
                 this.initPieces();
 
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.raycaster = new THREE.Raycaster();
-                this.renderer.domElement.addEventListener('click', e => this.onClick(e));
+                this.renderer.domElement.addEventListener('click', e => this.click(e));
 
-                this.activeData = {};
-                this.rolledVal = null;
-                this.rollCount = 0; // Für 3x Regel
-                this.timerInt = null;
+                this.active = {};
+                this.rolled = null;
+                this.rollCount = 0;
+                this.tmr = null;
 
-                this.setupSocket();
-                this.animate();
+                this.socketListeners();
+                this.loop();
             }
 
             initPieces() {
                 ['red','blue','green','yellow'].forEach(c => {
-                    for(let i=0; i<4; i++) this.pieces.push(new HorrorPiece(c, i, this.scene, this.board));
+                    for(let i=0;i<4;i++) this.pieces.push(new Piece(c,i,this.scene,this.board));
                 });
             }
 
-            setupSocket() {
-                socket.on('turnChanged', data => {
-                    this.activeData = data;
-                    this.rolledVal = null;
-                    this.rollCount = 0; // Reset für neuen Zug
-                    
-                    document.getElementById('turn-name').innerText = data.activeName;
-                    document.getElementById('turn-name').style.color = '#' + COLORS[data.activeColor].toString(16);
-                    
-                    this.startTimer(data.timeout);
+            socketListeners() {
+                socket.on('turnChanged', d => {
+                    this.active = d; this.rolled = null; this.rollCount = 0;
+                    document.getElementById('turn-name').innerText = d.activeName;
+                    document.getElementById('turn-name').style.color = '#'+COLORS[d.activeColor].toString(16);
+                    this.timer(d.timeout);
 
                     const btn = document.getElementById('btn-action');
-                    const msg = document.getElementById('status-msg');
-
-                    if(data.activeColor === myData.color) {
-                        msg.innerText = "DU BIST DRAN!";
-                        msg.style.color = "#00ff00";
+                    if(d.activeColor === myData.color) {
+                        document.getElementById('status-msg').innerText = "DU BIST DRAN!";
+                        document.getElementById('status-msg').style.color = "#0f0";
                         btn.style.display = 'inline-block';
-                        btn.innerText = "WÜRFELN";
-                        btn.onclick = () => this.tryRollDice();
                     } else {
-                        msg.innerText = `${data.activeName} überlegt...`;
-                        msg.style.color = "#fff";
+                        document.getElementById('status-msg').innerText = d.activeName + " ist dran...";
+                        document.getElementById('status-msg').style.color = "#fff";
                         btn.style.display = 'none';
                     }
-
-                    if(data.isBot && myData.isHost) {
-                        setTimeout(() => socket.emit('rollDice', { roomId: document.getElementById('room-id').value }), 1500);
-                    }
+                    if(d.isBot) setTimeout(()=>socket.emit('rollDice', {roomId:document.getElementById('room-input').value}), 1000);
                 });
 
                 socket.on('statusMessage', d => document.getElementById('status-msg').innerText = d.msg);
 
-                socket.on('diceRolled', data => {
-                    clearInterval(this.timerInt);
-                    document.getElementById('timer-box').innerText = "-";
-
-                    this.dice.animateRoll(data.value, () => {
-                        if(data.playerId === socket.id) {
-                            this.handleMyRoll(data.value);
-                        } else {
-                            document.getElementById('status-msg').innerText = `${this.activeData.activeName} würfelt ${data.value}.`;
-                        }
+                socket.on('diceRolled', d => {
+                    clearInterval(this.tmr); document.getElementById('timer-box').innerText="-";
+                    this.dice.anim(d.value, () => {
+                        if(d.playerId === socket.id) this.handleRoll(d.value);
+                        else document.getElementById('status-msg').innerText = this.active.activeName + " würfelt " + d.value;
                     });
                 });
 
-                socket.on('pieceMoved', data => {
-                    const p = this.pieces.find(pc => pc.color === this.activeData.activeColor && pc.index === data.pieceId);
-                    if(p) {
-                        p.move(data.newPosition);
-                        this.checkKills(p);
-                    }
+                socket.on('pieceMoved', d => {
+                    const p = this.pieces.find(pc => pc.col===this.active.activeColor && pc.idx===d.pieceId);
+                    if(p) { p.move(d.newPosition); this.checkKill(p); }
                 });
             }
 
-            handleMyRoll(val) {
-                this.rolledVal = val;
-                this.rollCount++;
+            handleRoll(val) {
+                this.rolled = val; this.rollCount++;
                 const btn = document.getElementById('btn-action');
-                const msg = document.getElementById('status-msg');
-
-                // Check: Alle im Haus?
-                const myPieces = this.pieces.filter(p => p.color === myData.color);
-                const allInBase = myPieces.every(p => p.pos === -1);
-
-                msg.innerText = `Gewürfelt: ${val}.`;
                 btn.style.display = 'none';
+                document.getElementById('status-msg').innerText = "Gewürfelt: " + val;
 
-                if(allInBase) {
+                const myPs = this.pieces.filter(p => p.col === myData.color);
+                const allHome = myPs.every(p => p.pos === -1);
+
+                if(allHome) {
                     if(val === 6) {
-                        msg.innerText = "Eine 6! Ziehe raus!";
-                        // Muss rausziehen
+                        document.getElementById('status-msg').innerText = "6! Ziehe raus!";
                     } else {
                         if(this.rollCount < 3) {
-                            msg.innerText = `Keine 6. Versuch ${this.rollCount}/3. Würfle nochmal!`;
-                            btn.style.display = 'inline-block';
-                            btn.innerText = "NOCHMAL";
-                            this.rolledVal = null; // Reset für Logik
-                            return; // Warten auf nächsten Click
+                            document.getElementById('status-msg').innerText = "Keine 6. Nochmal ("+this.rollCount+"/3)";
+                            btn.style.display = 'inline-block'; this.rolled = null;
                         } else {
-                            msg.innerText = "Leider keine 6 nach 3 Versuchen.";
-                            setTimeout(() => this.endTurn(), 2000);
-                            return;
+                            setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
                         }
                     }
+                } else {
+                    if(!this.canMove()) {
+                        document.getElementById('status-msg').innerText = "Kein Zug möglich.";
+                        setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
+                    }
                 }
-
-                // Normaler Zug
-                if(!this.canMove()) {
-                    setTimeout(() => {
-                        msg.innerText = "Kein Zug möglich.";
-                        setTimeout(() => this.endTurn(), 1000);
-                    }, 1000);
-                }
-            }
-
-            startTimer(sec) {
-                if(this.timerInt) clearInterval(this.timerInt);
-                let t = Math.floor(sec);
-                document.getElementById('timer-box').innerText = t;
-                this.timerInt = setInterval(() => {
-                    t--;
-                    document.getElementById('timer-box').innerText = t;
-                    if(t<=0) clearInterval(this.timerInt);
-                }, 1000);
             }
 
             canMove() {
-                return this.pieces.filter(p => p.color === myData.color).some(p => {
-                    if(p.pos === -1) return this.rolledVal === 6;
-                    return p.pos + this.rolledVal <= 43;
+                return this.pieces.filter(p=>p.col===myData.color).some(p => {
+                    if(p.pos===-1) return this.rolled===6;
+                    return p.pos+this.rolled<=43;
                 });
             }
 
-            tryRollDice() {
-                socket.emit('rollDice', { roomId: document.getElementById('room-id').value });
-            }
+            roll() { socket.emit('rollDice', {roomId:document.getElementById('room-input').value}); }
 
-            onClick(e) {
-                if(!this.rolledVal || this.activeData.activeColor !== myData.color) return;
-
-                const mouse = new THREE.Vector2(
-                    (e.clientX / window.innerWidth) * 2 - 1,
-                    -(e.clientY / window.innerHeight) * 2 + 1
-                );
-                this.raycaster.setFromCamera(mouse, this.camera);
-                const intersects = this.raycaster.intersectObjects(this.scene.children, true);
-
-                for(let hit of intersects) {
-                    let obj = hit.object;
-                    while(obj.parent && !obj.userData.piece) obj = obj.parent;
-                    if(obj.userData.piece) {
-                        const p = obj.userData.piece;
-                        if(p.color === myData.color) {
-                            this.attemptMove(p);
-                            return;
-                        }
+            click(e) {
+                if(!this.rolled || this.active.activeColor!==myData.color) return;
+                const m = new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
+                this.raycaster.setFromCamera(m, this.camera);
+                const hits = this.raycaster.intersectObjects(this.scene.children, true);
+                for(let h of hits) {
+                    let o = h.object; while(o.parent && !o.userData.p) o=o.parent;
+                    if(o.userData.p && o.userData.p.col===myData.color) {
+                        this.tryMove(o.userData.p); return;
                     }
                 }
             }
 
-            attemptMove(p) {
-                let target = -1;
-                if(p.pos === -1) {
-                    if(this.rolledVal === 6) target = 0; else return;
-                } else {
-                    target = p.pos + this.rolledVal;
-                    if(target > 43) return;
-                }
+            tryMove(p) {
+                let n = -1;
+                if(p.pos===-1) { if(this.rolled===6) n=0; else return; }
+                else { n=p.pos+this.rolled; if(n>43) return; }
 
-                const abs = this.board.getAbsPos(target, myData.color);
-                socket.emit('movePiece', { roomId: document.getElementById('room-id').value, pieceId: p.index, newPosition: target });
-
-                if(this.board.isTrap(abs) && target < 40) this.showQuiz(p);
-                else this.checkExtra();
+                const abs = this.board.abs(n, myData.color);
+                socket.emit('movePiece', {roomId:document.getElementById('room-input').value, pieceId:p.idx, newPosition:n});
+                
+                if(this.board.isTrap(abs) && n<40) this.quiz(p);
+                else this.finish();
             }
 
-            checkExtra() {
-                if(this.rolledVal === 6) {
-                    this.rolledVal = null;
-                    this.rollCount = 0; // Reset Count bei 6
-                    document.getElementById('status-msg').innerText = "Eine 6! Würfle nochmal!";
-                    const btn = document.getElementById('btn-action');
-                    btn.style.display = 'inline-block';
-                    btn.innerText = "WÜRFELN";
-                    btn.onclick = () => this.tryRollDice();
-                } else {
-                    this.endTurn();
-                }
-            }
-            
-            endTurn() {
-                socket.emit('endTurn', { roomId: document.getElementById('room-id').value });
+            finish() {
+                if(this.rolled===6) {
+                    this.rolled=null; this.rollCount=0;
+                    document.getElementById('status-msg').innerText="6! Nochmal!";
+                    document.getElementById('btn-action').style.display='inline-block';
+                } else socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
             }
 
-            showQuiz(p) {
-                const s = document.getElementById('quiz-screen');
-                s.classList.remove('hidden');
+            quiz(p) {
+                const scr = document.getElementById('quiz-screen'); scr.classList.remove('hidden');
                 const q = QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
-                document.getElementById('q-text').innerText = q.q;
-                const o = document.getElementById('q-opts');
-                o.innerHTML = '';
-                q.a.forEach((ans, i) => {
-                    const d = document.createElement('div');
-                    d.className = 'quiz-opt'; d.innerText = ans;
-                    d.onclick = () => {
-                        s.classList.add('hidden');
-                        if(i === q.c) {
-                            alert("Richtig! Du bist sicher.");
-                            this.checkExtra();
-                        } else {
-                            alert("Falsch! Zurück ins Grab!");
-                            socket.emit('movePiece', { roomId: document.getElementById('room-id').value, pieceId: p.index, newPosition: -1 });
-                            this.endTurn();
+                document.getElementById('q-text').innerText=q.q;
+                const div = document.getElementById('q-opts'); div.innerHTML='';
+                q.a.forEach((a,i) => {
+                    const b = document.createElement('div'); b.className='quiz-opt'; b.innerText=a;
+                    b.onclick = () => {
+                        scr.classList.add('hidden');
+                        if(i===q.c) { alert("Richtig!"); this.finish(); }
+                        else { 
+                            alert("Falsch!"); 
+                            socket.emit('movePiece', {roomId:document.getElementById('room-input').value, pieceId:p.idx, newPosition:-1});
+                            socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
                         }
                     };
-                    o.appendChild(d);
-                });
-            }
-            
-            checkKills(attacker) {
-                if(attacker.pos < 0 || attacker.pos >= 40) return;
-                const aAbs = this.board.getAbsPos(attacker.pos, attacker.color);
-                this.pieces.forEach(v => {
-                    if(v !== attacker && v.pos >= 0 && v.pos < 40) {
-                        const vAbs = this.board.getAbsPos(v.pos, v.color);
-                        if(aAbs === vAbs) v.move(-1);
-                    }
+                    div.appendChild(b);
                 });
             }
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
-                this.controls.update();
-                this.renderer.render(this.scene, this.camera);
+            checkKill(atk) {
+                if(atk.pos<0 || atk.pos>=40) return;
+                const aPos = this.board.abs(atk.pos, atk.col);
+                this.pieces.forEach(v => {
+                    if(v!==atk && v.pos>=0 && v.pos<40 && this.board.abs(v.pos, v.col)===aPos) v.move(-1);
+                });
             }
+
+            timer(s) {
+                if(this.tmr) clearInterval(this.tmr);
+                let t=Math.floor(s); document.getElementById('timer-box').innerText=t;
+                this.tmr=setInterval(()=>{ t--; document.getElementById('timer-box').innerText=t; if(t<=0) clearInterval(this.tmr);}, 1000);
+            }
+            loop() { requestAnimationFrame(()=>this.loop()); this.controls.update(); this.renderer.render(this.scene,this.camera); }
         }
 
-        // --- PIECES (Gleich wie vorher) ---
-        class HorrorPiece {
-            constructor(c, i, s, b) {
-                this.color=c; this.index=i; this.board=b; this.pos=-1;
-                this.mesh=new THREE.Group(); this.mesh.userData={piece:this};
-                if(c==='red') this.buildDoll();
-                if(c==='blue') this.buildCross();
-                if(c==='green') this.buildStone();
-                if(c==='yellow') this.buildGhost();
-                s.add(this.mesh); this.move(-1, true);
-            }
-            buildDoll() {
-                const matD = new THREE.MeshStandardMaterial({color:0x880000});
-                const matS = new THREE.MeshStandardMaterial({color:0xdddddd});
-                this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7, 1.5, 16), matD).translateY(0.75));
-                this.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.4), matS).translateY(1.6));
-                const hair = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshStandardMaterial({color:0x220000}));
-                this.mesh.add(hair.clone().translateY(1.7).translateX(-0.35));
-                this.mesh.add(hair.clone().translateY(1.7).translateX(0.35));
-                const blade = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.05), new THREE.MeshStandardMaterial({color:0xffffff, metalness:1}));
-                blade.position.set(0.6, 1.0, 0.2); blade.rotation.x=Math.PI/2;
-                this.mesh.add(blade);
-            }
-            buildCross() {
-                const mat = new THREE.MeshStandardMaterial({color:0x3d2817});
-                const v = new THREE.Mesh(new THREE.BoxGeometry(0.4, 2, 0.3), mat).translateY(1);
-                const h = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.35, 0.3), mat).translateY(1.3);
-                h.rotation.z = -0.1;
-                this.mesh.add(v); this.mesh.add(h);
-                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.5), new THREE.MeshStandardMaterial({color:0x333333}));
-                rock.position.y=0.2; this.mesh.add(rock);
-            }
-            buildStone() {
-                const mat = new THREE.MeshStandardMaterial({color:0x556655});
-                const base = new THREE.Mesh(new THREE.BoxGeometry(1, 1.5, 0.4), mat).translateY(0.75);
-                const top = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 16), mat).translateY(1.5);
-                top.rotation.x = Math.PI/2;
-                this.mesh.add(base); this.mesh.add(top);
-                const txt = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.15, 0.42), new THREE.MeshBasicMaterial({color:0}));
-                txt.position.set(0, 1.2, 0); this.mesh.add(txt);
-            }
-            buildGhost() {
-                const mat = new THREE.MeshStandardMaterial({color:0xffffcc, transparent:true, opacity:0.7});
-                const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5, 1, 4, 8), mat).translateY(1);
-                this.mesh.add(body);
-                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1), new THREE.MeshBasicMaterial({color:0}));
-                this.mesh.add(eye.clone().position.set(-0.2, 1.3, 0.4));
-                this.mesh.add(eye.clone().position.set(0.2, 1.3, 0.4));
+        // --- MODELS ---
+        class Piece {
+            constructor(c,i,s,b) {
+                this.col=c; this.idx=i; this.board=b; this.pos=-1;
+                this.mesh=new THREE.Group(); this.mesh.userData={p:this};
+                const mat = new THREE.MeshStandardMaterial({color:COLORS[c]});
+                
+                if(c==='red') { // Puppe
+                    this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7,1.5,16), mat).translateY(0.75));
+                    this.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color:0xffcccc})).translateY(1.6));
+                } else if(c==='blue') { // Kreuz
+                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.4,2,0.3), mat).translateY(1));
+                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1.4,0.3,0.3), mat).translateY(1.3));
+                } else if(c==='green') { // Stein
+                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.4), mat).translateY(0.75));
+                    this.mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.4,16), mat).rotateX(Math.PI/2).translateY(1.5));
+                } else { // Geist
+                    const gm = new THREE.MeshStandardMaterial({color:COLORS[c], transparent:true, opacity:0.7});
+                    this.mesh.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5,1,4,8), gm).translateY(1));
+                }
+                s.add(this.mesh); this.move(-1,true);
             }
             move(p, instant) {
-                this.pos = p;
-                const t = this.board.getPos(p, this.color);
-                if(p===-1) {
-                    t.x += (this.index%2===0 ? -1.5 : 1.5);
-                    t.z += (this.index<2 ? -1.5 : 1.5);
-                }
+                this.pos=p; const t = this.board.pos(p, this.col, this.idx);
                 if(instant) this.mesh.position.copy(t);
                 else {
-                    const start = this.mesh.position.clone();
-                    let alpha = 0;
-                    const anim = () => {
-                        alpha += 0.05; if(alpha>1) alpha=1;
-                        this.mesh.position.lerpVectors(start, t, alpha);
-                        this.mesh.position.y = Math.sin(alpha*Math.PI)*2;
-                        if(alpha<1) requestAnimationFrame(anim); else this.mesh.position.y = 0;
-                    };
-                    anim();
+                    const s = this.mesh.position.clone(); let a=0;
+                    const l = () => { a+=0.05; if(a>1)a=1; this.mesh.position.lerpVectors(s,t,a); 
+                    this.mesh.position.y=Math.sin(a*Math.PI)*2; if(a<1)requestAnimationFrame(l); else this.mesh.position.y=0; };
+                    l();
                 }
             }
         }
 
-        // --- BOARD ---
         class Board {
-            constructor(s, traps) {
-                this.scene=s; this.traps=traps; this.S=2.5;
-                this.createTiles();
-            }
-            createTiles() {
-                const p = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x221111}));
-                p.position.y=-0.6; p.receiveShadow=true; this.scene.add(p);
+            constructor(s,t) { this.s=2.5; this.traps=t; this.mk(); }
+            mk() {
+                // Felder
                 for(let i=0; i<40; i++) {
-                    const pos = this.getVec(i);
-                    const isTrap = this.traps.includes(i);
-                    // Standardfarben
-                    let col = isTrap ? 0xaa00aa : 0x444444;
-                    
-                    // STARTFELDER FARBIG MACHEN
-                    if(i === 0) col = COLORS.red;
-                    if(i === 10) col = COLORS.blue;
-                    if(i === 20) col = COLORS.green;
-                    if(i === 30) col = COLORS.yellow;
-
-                    const t = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.2,2.3), new THREE.MeshStandardMaterial({color:col}));
-                    t.position.copy(pos); t.receiveShadow=true; this.scene.add(t);
-                    if(isTrap) {
+                    let col = this.traps.includes(i) ? 0xaa00aa : 0x444444;
+                    if(i===0) col=COLORS.red; if(i===10) col=COLORS.blue; if(i===20) col=COLORS.green; if(i===30) col=COLORS.yellow;
+                    const m = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.2,2.3), new THREE.MeshStandardMaterial({color:col}));
+                    m.position.copy(this.vec(i)); m.position.y=0.1; this.s.add(m);
+                    if(this.traps.includes(i)) {
                         const q = new THREE.Mesh(new THREE.BoxGeometry(0.4,1,0.4), new THREE.MeshBasicMaterial({color:0xff00ff}));
-                        q.position.set(pos.x, 0.5, pos.z); this.scene.add(q);
+                        q.position.copy(m.position); q.position.y=0.6; this.s.add(q);
                     }
                 }
-                ['red','blue','green','yellow'].forEach(c=>this.createBase(c));
+                // Bases
+                ['red','blue','green','yellow'].forEach(c => {
+                    let x=15, z=15; if(c==='blue') z=-15; if(c==='green'){x=-15;z=-15;} if(c==='yellow') x=-15;
+                    const b = new THREE.Mesh(new THREE.CylinderGeometry(5,5,0.2,32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
+                    b.position.set(x,0.1,z); this.s.add(b);
+                });
+                // Safezones
+                for(let s=1; s<=4; s++) { // 4 Schritte rein
+                    this.safe('red', s, 0); this.safe('blue', s, 1); this.safe('green', s, 2); this.safe('yellow', s, 3);
+                }
             }
-            getVec(i) {
-                const arm=Math.floor(i/10); const loc=i%10;
-                let x=0, z=0;
-                if(loc<5) {x=1*this.S; z=(5-loc)*this.S;} else {x=(loc-3)*this.S; z=1*this.S;}
-                const ang = -arm*Math.PI/2;
+            safe(c, step, rot) {
+                 const v = new THREE.Vector3(0,0,(5-step)*this.s);
+                 const ang = -rot*Math.PI/2;
+                 const rx = v.x*Math.cos(ang)-v.z*Math.sin(ang); const rz = v.x*Math.sin(ang)+v.z*Math.cos(ang);
+                 const m = new THREE.Mesh(new THREE.BoxGeometry(2,0.2,2), new THREE.MeshStandardMaterial({color:COLORS[c]}));
+                 m.position.set(rx, 0.1, rz); this.s.add(m);
+            }
+            vec(i) {
+                const a=Math.floor(i/10), l=i%10; let x=0,z=0;
+                if(l<5){x=1*this.s; z=(5-l)*this.s;} else {x=(l-3)*this.s; z=1*this.s;}
+                const ang = -a*Math.PI/2;
                 return new THREE.Vector3(x*Math.cos(ang)-z*Math.sin(ang), 0.1, x*Math.sin(ang)+z*Math.cos(ang));
             }
-            createBase(c) {
-                let x=15, z=15; if(c==='blue') z=-15; if(c==='green') {x=-15; z=-15;} if(c==='yellow') x=-15;
-                const m = new THREE.Mesh(new THREE.CylinderGeometry(5,5,0.2,32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
-                m.position.set(x,0.1,z); this.scene.add(m);
-            }
-            getAbsPos(i, c) {
-                let off=0; if(c==='blue') off=10; if(c==='green') off=20; if(c==='yellow') off=30;
-                return (i+off)%40;
-            }
-            isTrap(abs) { return this.traps.includes(abs); }
-            getPos(i, c) {
+            abs(i,c){ let o=0; if(c==='blue')o=10; if(c==='green')o=20; if(c==='yellow')o=30; return (i+o)%40; }
+            pos(i,c,idx) {
                 if(i===-1) {
                     let x=15, z=15; if(c==='blue') z=-15; if(c==='green') {x=-15; z=-15;} if(c==='yellow') x=-15;
+                    x += (idx%2===0?-1.5:1.5); z += (idx<2?-1.5:1.5);
                     return new THREE.Vector3(x,0,z);
                 }
                 if(i>=40) {
-                    const step = i-40+1;
-                    const v = new THREE.Vector3(0,0,(5-step)*this.S);
-                    let rot=0; if(c==='blue') rot=1; if(c==='green') rot=2; if(c==='yellow') rot=3;
-                    const ang = -rot*Math.PI/2;
-                    // Zielpfad Farbe rendern (Trick: wir erstellen die Tiles dynamisch beim ersten Zugriff oder einfach nur Position berechnen)
-                    // Hier berechnen wir nur Position. Die Visualisierung der Ziel-Tiles fehlt in createTiles, 
-                    // ich füge sie hier der Einfachheit halber nicht hinzu um den Code kurz zu halten, 
-                    // aber die Figuren laufen korrekt in die Mitte.
-                    return new THREE.Vector3(v.x*Math.cos(ang)-v.z*Math.sin(ang), 0.1, v.x*Math.sin(ang)+v.z*Math.cos(ang));
+                     const st = i-40+1; const v = new THREE.Vector3(0,0,(5-st)*this.s);
+                     let r=0; if(c==='blue')r=1; if(c==='green')r=2; if(c==='yellow')r=3;
+                     const ang = -r*Math.PI/2;
+                     return new THREE.Vector3(v.x*Math.cos(ang)-v.z*Math.sin(ang), 0, v.x*Math.sin(ang)+v.z*Math.cos(ang));
                 }
-                return this.getVec(this.getAbsPos(i, c));
+                const v = this.vec(this.abs(i,c)); v.y=0; return v;
             }
+            isTrap(a){return this.traps.includes(a);}
         }
 
-        // --- DICE ---
         class Dice {
             constructor(s) {
-                const geo = new THREE.BoxGeometry(3,3,3);
-                const mats = [];
-                for(let i=1;i<=6;i++) {
-                    const c = document.createElement('canvas'); c.width=64; c.height=64;
-                    const ctx = c.getContext('2d');
-                    ctx.fillStyle='#e3dac9'; ctx.fillRect(0,0,64,64);
-                    ctx.lineWidth=4; ctx.strokeStyle='#550000'; ctx.strokeRect(0,0,64,64);
-                    ctx.fillStyle='#880000'; ctx.font='bold 40px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
-                    ctx.fillText(i, 32, 32);
-                    mats.push(new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
+                const g = new THREE.BoxGeometry(3,3,3); const m=[];
+                for(let i=1;i<=6;i++){
+                    const c=document.createElement('canvas');c.width=64;c.height=64;
+                    const x=c.getContext('2d');x.fillStyle='#eee';x.fillRect(0,0,64,64);
+                    x.fillStyle='red';x.font='40px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(i,32,32);
+                    x.lineWidth=4;x.strokeRect(0,0,64,64);
+                    m.push(new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
                 }
-                this.mesh = new THREE.Mesh(geo, mats);
-                this.mesh.position.set(0, 5, 0); s.add(this.mesh);
+                this.m=new THREE.Mesh(g,m); this.m.position.set(0,5,0); s.add(this.m);
             }
-            roll(val, cb) { this.animateRoll(val, cb); }
-            animateRoll(val, cb) {
-                let t=0;
-                const iv = setInterval(() => {
-                    this.mesh.rotation.x += 0.5; this.mesh.rotation.y += 0.5;
-                    t+=50;
-                    if(t>800) {
-                        clearInterval(iv);
-                        this.mesh.rotation.set(0,0,0);
-                        if(val===1) this.mesh.rotation.y = Math.PI/2; 
-                        if(val===2) this.mesh.rotation.y = -Math.PI/2;
-                        if(val===3) this.mesh.rotation.x = 0; 
-                        if(val===4) this.mesh.rotation.x = Math.PI;
-                        if(val===5) this.mesh.rotation.x = -Math.PI/2;
-                        if(val===6) this.mesh.rotation.x = Math.PI/2;
-                        if(cb) cb();
-                    }
-                }, 50);
+            anim(v, cb) {
+                let t=0; const i=setInterval(()=>{
+                    this.m.rotation.x+=0.5; this.m.rotation.y+=0.5; t+=50;
+                    if(t>800){clearInterval(i); this.m.rotation.set(0,0,0); cb();}
+                },50);
             }
         }
     </script>
