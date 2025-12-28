@@ -1,6 +1,6 @@
 {
   "name": "horror-ludo-repair",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "description": "Fixed Ludo Version",
   "main": "server.js",
   "scripts": {
