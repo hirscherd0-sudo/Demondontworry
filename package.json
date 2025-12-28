@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-3d",
-  "version": "2.0.0",
-  "description": "Horror Ludo mit Quiz und Multiplayer",
+  "name": "horror-ludo-redeemed",
+  "version": "6.6.6",
+  "description": "Horror Ludo - Stable Version",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
