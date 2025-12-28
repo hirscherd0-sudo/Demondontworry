@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Mensch ärgere dich nicht</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: sans-serif; background-color: #222; color: white; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .interactive { pointer-events: auto; }
+        
+        #menu-screen { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10; pointer-events: auto;
+        }
+        
+        #game-hud { display: none; padding: 20px; }
+        
+        button {
+            background: #ff9800; border: none; padding: 15px 30px; margin: 10px; 
+            color: white; font-size: 1.2rem; cursor: pointer; border-radius: 8px;
+        }
+        button:hover { background: #f57c00; }
+        button:disabled { background: #555; cursor: not-allowed; }
+
+        .info-panel {
+            position: absolute; top: 20px; left: 20px; 
+            background: rgba(0,0,0,0.6); padding: 15px; border-radius: 8px;
+        }
+        
+        #dice-btn {
+            position: absolute; bottom: 50px; right: 50px;
+            width: 100px; height: 100px; border-radius: 50%;
+            font-size: 2rem; font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        #status-text { font-size: 1.5rem; margin-bottom: 10px; font-weight: bold; }
+        .room-input { padding: 10px; font-size: 1rem; margin: 10px; }
+    </style>
+    <!-- Three.js und Socket.io einbinden -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <!-- Startbildschirm -->
+        <div id="menu-screen">
+            <h1>Mensch ärgere dich nicht 3D</h1>
+            <button onclick="startGame('offline')">Einzelspieler (vs KI)</button>
+            <div style="margin-top:20px; background:rgba(255,255,255,0.1); padding:20px; border-radius:10px;">
+                <input type="text" id="room-id" class="room-input interactive" value="Lobby1" placeholder="Raum Name">
+                <button onclick="startGame('online')">Online Beitreten</button>
+            </div>
+        </div>
+
+        <!-- Spiel HUD -->
+        <div id="game-hud" class="interactive">
+            <div class="info-panel">
+                <div id="status-text">Warte auf Start...</div>
+                <div id="turn-indicator">Am Zug: <span id="current-player-color" style="color:red">ROT</span></div>
+                <div id="dice-result">Würfel: -</div>
+            </div>
+            <button id="dice-btn" onclick="game.rollDice()" disabled>🎲</button>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURATION ---
+        const COLORS = {
+            red: 0xff0000,
+            blue: 0x0000ff,
+            green: 0x008000,
+            yellow: 0xffff00
+        };
+        
+        // --- SPIELFELD LOGIK ---
+        class LudoBoard {
+            constructor(scene) {
+                this.scene = scene;
+                this.createBoard();
+            }
+
+            createBoard() {
+                // Bodenplatte
+                const plane = new THREE.Mesh(
+                    new THREE.BoxGeometry(22, 1, 22),
+                    new THREE.MeshPhongMaterial({ color: 0x222222 })
+                );
+                plane.position.y = -0.5;
+                plane.receiveShadow = true;
+                this.scene.add(plane);
+
+                // Startbereiche visualisieren
+                this.createStartArea(10, 10, 'red');
+                this.createStartArea(-10, 10, 'blue'); // Achtung: Koordinaten angepasst für Logik
+                this.createStartArea(-10, -10, 'green');
+                this.createStartArea(10, -10, 'yellow');
+            }
+            
+            createStartArea(x, z, color) {
+                const mat = new THREE.MeshPhongMaterial({ color: COLORS[color] });
+                // 4 Plätze pro Haus
+                for(let i=0; i<2; i++) {
+                    for(let j=0; j<2; j++) {
+                        const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.1, 32), mat);
+                        // Positionierung um das Zentrum x,z
+                        plate.position.set(x + (i*2.5)-1.25, 0.1, z + (j*2.5)-1.25);
+                        plate.receiveShadow = true;
+                        this.scene.add(plate);
+                    }
+                }
+            }
+            
+            // Berechnet 3D Position basierend auf Spielfeld-Index (0-39)
+            getPositionForIndex(index, playerColor) {
+                const r = 7; 
+                // Offset berechnen damit jede Farbe woanders startet
+                let offset = 0;
+                if(playerColor === 'blue') offset = 10;
+                if(playerColor === 'green') offset = 20;
+                if(playerColor === 'yellow') offset = 30;
+
+                let effectiveIndex = (index + offset) % 40;
+                
+                // Zielfelder Logik (Index >= 40)
+                if(index >= 40) {
+                    const step = index - 40 + 1;
+                    if(playerColor === 'red') return new THREE.Vector3(step*1.5, 0.5, 8); // Beispielhaft
+                    if(playerColor === 'blue') return new THREE.Vector3(-8, 0.5, step*1.5);
+                    if(playerColor === 'green') return new THREE.Vector3(-step*1.5, 0.5, -8);
+                    if(playerColor === 'yellow') return new THREE.Vector3(8, 0.5, -step*1.5);
+                    // Fallback für vereinfachte Demo:
+                    return new THREE.Vector3(0, 1, 0); 
+                }
+
+                // Kreisförmiger Pfad für Demo-Zwecke (einfacher als Kreuzform-Formel)
+                const angle = (effectiveIndex / 40) * Math.PI * 2;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+                return new THREE.Vector3(x, 0.5, z);
+            }
+            
+            getHomePosition(playerColor, pieceIndex) {
+                // Feste Startpositionen
+                let bx=0, bz=0;
+                if(playerColor === 'red') { bx=10; bz=10; }
+                if(playerColor === 'blue') { bx=-10; bz=10; }
+                if(playerColor === 'green') { bx=-10; bz=-10; }
+                if(playerColor === 'yellow') { bx=10; bz=-10; }
+                
+                const offsetX = (pieceIndex % 2 === 0 ? -1.25 : 1.25);
+                const offsetZ = (pieceIndex < 2 ? -1.25 : 1.25);
+                return new THREE.Vector3(bx + offsetX, 0.5, bz + offsetZ);
+            }
+        }
+
+        // --- SPIELFIGUR ---
+        class GamePiece {
+            constructor(color, index, scene, board) {
+                this.color = color;
+                this.index = index;
+                this.positionIndex = -1; // -1 = Home
+                this.board = board;
+
+                const geo = new THREE.SphereGeometry(0.6, 32, 32);
+                const mat = new THREE.MeshStandardMaterial({ color: COLORS[color] });
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.castShadow = true;
+                this.mesh.userData = { piece: this };
+                
+                scene.add(this.mesh);
+                this.updatePositionVisuals(true);
+            }
+
+            updatePositionVisuals(instant = false) {
+                let targetPos;
+                if(this.positionIndex === -1) {
+                    targetPos = this.board.getHomePosition(this.color, this.index);
+                } else {
+                    targetPos = this.board.getPositionForIndex(this.positionIndex, this.color);
+                }
+
+                if(instant) {
+                    this.mesh.position.copy(targetPos);
+                } else {
+                    // Kleine Animation
+                    const start = this.mesh.position.clone();
+                    let alpha = 0;
+                    const animate = () => {
+                        alpha += 0.05;
+                        if(alpha > 1) alpha = 1;
+                        this.mesh.position.lerpVectors(start, targetPos, alpha);
+                        this.mesh.position.y = 0.5 + Math.sin(alpha * Math.PI); // Sprung
+                        if(alpha < 1) requestAnimationFrame(animate);
+                        else this.mesh.position.y = 0.5;
+                    };
+                    animate();
+                }
+            }
+        }
+
+        // --- HAUPTSPIEL LOGIK ---
+        class Game {
+            constructor() {
+                this.mode = 'offline';
+                this.socket = null;
+                this.roomId = null;
+                this.myColor = 'red';
+                this.turnColor = 'red';
+                this.turnOrder = ['red', 'blue', 'green', 'yellow'];
+                this.rolledValue = null;
+                this.hasRolled = false;
+                
+                this.initThree();
+                this.board = new LudoBoard(this.scene);
+                this.pieces = [];
+                this.initPieces();
+                
+                // Raycaster für Mausklicks
+                this.raycaster = new THREE.Raycaster();
+                window.addEventListener('click', (e) => this.onMouseClick(e));
+                
+                this.animate();
+            }
+
+            initThree() {
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x333333);
+                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+                this.camera.position.set(0, 25, 20);
+                this.camera.lookAt(0, 0, 0);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                document.body.appendChild(this.renderer.domElement);
+
+                const light = new THREE.DirectionalLight(0xffffff, 1);
+                light.position.set(10, 20, 10);
+                light.castShadow = true;
+                this.scene.add(light);
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+            }
+
+            initPieces() {
+                ['red', 'blue', 'green', 'yellow'].forEach(c => {
+                    for(let i=0; i<4; i++) this.pieces.push(new GamePiece(c, i, this.scene, this.board));
+                });
+            }
+
+            startOffline() {
+                this.mode = 'offline';
+                this.myColor = 'red';
+                this.startGameUI();
+            }
+
+            startOnline(roomId) {
+                this.mode = 'online';
+                this.roomId = roomId;
+                this.socket = io();
+                
+                this.socket.emit('joinGame', roomId);
+
+                this.socket.on('playerJoined', (data) => {
+                    this.myColor = data.color;
+                    console.log("Verbunden als: " + this.myColor);
+                    this.startGameUI();
+                });
+
+                this.socket.on('diceRolled', (data) => {
+                    if(data.playerId !== this.socket.id) {
+                        this.rolledValue = data.value;
+                        this.hasRolled = true;
+                        document.getElementById('dice-result').innerText = `Gegner würfelt: ${data.value}`;
+                    }
+                });
+
+                this.socket.on('pieceMoved', (data) => {
+                    // Suche Figur des Gegners und bewege sie
+                    const piece = this.pieces.find(p => p.color === this.turnColor && p.index === data.pieceId);
+                    if(piece) piece.updatePositionVisuals(); // In echter Logik hier Index setzen
+                    
+                    // Da wir vereinfacht sind, setzen wir den Status direkt visuell neu? 
+                    // Für saubere Synchronisation müssten wir den Index setzen:
+                    if(piece) {
+                        piece.positionIndex = data.newPosition;
+                        piece.updatePositionVisuals();
+                    }
+                });
+
+                this.socket.on('turnChanged', (data) => {
+                    this.turnColor = data.activeColor;
+                    this.hasRolled = false;
+                    this.rolledValue = null;
+                    this.updateUI();
+                });
+
+                this.socket.on('errorMsg', msg => alert(msg));
+            }
+            
+            startGameUI() {
+                document.getElementById('menu-screen').style.display = 'none';
+                document.getElementById('game-hud').style.display = 'block';
+                this.updateUI();
+            }
+
+            rollDice() {
+                if(this.mode === 'online' && this.turnColor !== this.myColor) return;
+                
+                const val = Math.floor(Math.random() * 6) + 1;
+                this.rolledValue = val;
+                this.hasRolled = true;
+                
+                document.getElementById('dice-result').innerText = `Würfel: ${val}`;
+                document.getElementById('dice-btn').disabled = true;
+
+                if(this.mode === 'online') {
+                    this.socket.emit('rollDice', { roomId: this.roomId, diceValue: val });
+                }
+
+                // Check ob man ziehen kann (sehr vereinfacht)
+                const canMove = this.pieces.some(p => p.color === this.turnColor && (p.positionIndex !== -1 || val === 6));
+                
+                if(!canMove) {
+                    setTimeout(() => this.endTurn(), 1000);
+                } else if(this.mode === 'offline' && this.turnColor !== this.myColor) {
+                    setTimeout(() => this.aiMove(), 1000); // KI Zug
+                }
+            }
+
+            onMouseClick(event) {
+                if(!this.hasRolled) return;
+                if(this.mode === 'online' && this.turnColor !== this.myColor) return;
+                if(this.mode === 'offline' && this.turnColor !== 'red') return;
+
+                const mouse = new THREE.Vector2(
+                    (event.clientX / window.innerWidth) * 2 - 1,
+                    -(event.clientY / window.innerHeight) * 2 + 1
+                );
+                this.raycaster.setFromCamera(mouse, this.camera);
+                const intersects = this.raycaster.intersectObjects(this.scene.children);
+
+                for(let hit of intersects) {
+                    if(hit.object.userData.piece) {
+                        const p = hit.object.userData.piece;
+                        if(p.color === this.turnColor) this.tryMove(p);
+                        break;
+                    }
+                }
+            }
+
+            tryMove(piece) {
+                let newPos = -1;
+                // Rauskommen nur mit 6
+                if(piece.positionIndex === -1) {
+                    if(this.rolledValue === 6) newPos = 0;
+                    else return;
+                } else {
+                    newPos = piece.positionIndex + this.rolledValue;
+                    if(newPos > 43) return; 
+                }
+
+                piece.positionIndex = newPos;
+                piece.updatePositionVisuals();
+
+                if(this.mode === 'online') {
+                    this.socket.emit('movePiece', { 
+                        roomId: this.roomId, 
+                        pieceId: piece.index, 
+                        newPosition: newPos 
+                    });
+                }
+
+                if(this.rolledValue !== 6) this.endTurn();
+                else {
+                    this.hasRolled = false; // Noch mal würfeln
+                    document.getElementById('dice-btn').disabled = false;
+                    document.getElementById('status-text').innerText = "Du darfst nochmal!";
+                }
+            }
+            
+            aiMove() {
+                // Sehr dumme Offline-KI
+                const p = this.pieces.find(p => p.color === this.turnColor && (p.positionIndex !== -1 || this.rolledValue === 6));
+                if(p) this.tryMove(p);
+                else this.endTurn();
+            }
+
+            endTurn() {
+                if(this.mode === 'online') {
+                    this.socket.emit('endTurn', { roomId: this.roomId });
+                } else {
+                    let idx = this.turnOrder.indexOf(this.turnColor);
+                    this.turnColor = this.turnOrder[(idx + 1) % 4];
+                    this.hasRolled = false;
+                    this.rolledValue = null;
+                    this.updateUI();
+                    
+                    if(this.turnColor !== 'red') setTimeout(() => this.rollDice(), 1500);
+                }
+            }
+
+            updateUI() {
+                const hud = document.getElementById('status-text');
+                const pInfo = document.getElementById('current-player-color');
+                pInfo.innerText = this.turnColor.toUpperCase();
+                pInfo.style.color = COLORS[this.turnColor] === 0xffff00 ? 'gold' : this.turnColor;
+
+                if(this.turnColor === this.myColor) {
+                    hud.innerText = "Du bist dran!";
+                    if(!this.hasRolled) document.getElementById('dice-btn').disabled = false;
+                } else {
+                    hud.innerText = `Warte auf ${this.turnColor}...`;
+                    document.getElementById('dice-btn').disabled = true;
+                }
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        let game;
+        function startGame(mode) {
+            if(!game) game = new Game();
+            const room = document.getElementById('room-id').value;
+            if(mode === 'online') game.startOnline(room);
+            else game.startOffline();
+        }
+    </script>
+</body>
+</html>
+
+
