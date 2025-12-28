@@ -9,7 +9,7 @@ const path = require('path');
 app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
-const TURN_TIMEOUT = 10000; // 10 Sekunden
+const TURN_TIMEOUT = 15000; // 15 Sekunden Zeit pro Zug
 
 function generateTrapFields() {
     const traps = [];
@@ -25,22 +25,20 @@ function nextTurn(roomId) {
     const room = rooms[roomId];
     if(!room) return;
 
-    // Alten Timer löschen
     if(room.timer) clearTimeout(room.timer);
 
-    // Nächster Spieler
     room.turnIndex = (room.turnIndex + 1) % 4;
     const activePlayer = room.players[room.turnIndex];
 
-    // Info an alle senden
+    // Info senden
     io.to(roomId).emit('turnChanged', { 
         activeColor: activePlayer.color,
-        activePlayerId: activePlayer.id,
         activeName: activePlayer.name,
-        isBot: activePlayer.isBot
+        isBot: activePlayer.isBot,
+        timeout: TURN_TIMEOUT / 1000
     });
 
-    // Neuen Timer starten (Nur fürs Würfeln)
+    // Server Timer starten
     room.timer = setTimeout(() => {
         io.to(roomId).emit('statusMessage', { msg: `Zeit abgelaufen für ${activePlayer.name}!` });
         nextTurn(roomId);
@@ -69,8 +67,8 @@ io.on('connection', (socket) => {
 
         if (room.players.length < 4) {
             const colors = ['red', 'blue', 'green', 'yellow'];
+            const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
             const playerColor = colors[room.players.length];
-            const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
             
             const player = {
                 id: socket.id,
@@ -81,10 +79,7 @@ io.on('connection', (socket) => {
             };
             room.players.push(player);
 
-            // Update Lobby
             io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
-
-            // Identität an den neuen Spieler senden
             socket.emit('setIdentity', { 
                 color: playerColor, 
                 figure: figures[playerColor],
@@ -97,9 +92,9 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
         if(!room || room.host !== socket.id) return;
 
-        // Bots auffüllen
+        // Bots
         const colors = ['red', 'blue', 'green', 'yellow'];
-        const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
+        const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
         
         while(room.players.length < 4) {
             const c = colors[room.players.length];
@@ -118,7 +113,6 @@ io.on('connection', (socket) => {
             trapFields: room.trapFields
         });
 
-        // Starten
         room.turnIndex = -1;
         nextTurn(roomId);
     });
@@ -126,15 +120,10 @@ io.on('connection', (socket) => {
     socket.on('rollDice', ({ roomId }) => {
         const room = rooms[roomId];
         if(!room) return;
-        
-        // Timer stoppen, da gewürfelt wurde
-        if(room.timer) clearTimeout(room.timer);
-        
+        if(room.timer) clearTimeout(room.timer); // Timer stoppen
+
         const val = Math.floor(Math.random() * 6) + 1;
         io.to(roomId).emit('diceRolled', { playerId: socket.id, value: val });
-        
-        // Optional: Move Timer starten, damit Spiel nicht hängt wenn einer nicht zieht
-        // (Für dieses Beispiel lassen wir es beim Würfeltimer)
     });
 
     socket.on('movePiece', ({ roomId, pieceId, newPosition }) => {
@@ -154,4 +143,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server läuft auf Port ${PORT}`);
 });
+
 
