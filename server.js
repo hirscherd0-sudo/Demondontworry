@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
 
         if (room.status === 'playing') {
-            socket.emit('errorMsg', 'Spiel läuft bereits!');
+            socket.emit('errorMsg', 'Spiel läuft bereits! Wähle einen anderen Raum.');
             return;
         }
 
@@ -95,13 +95,10 @@ io.on('connection', (socket) => {
         }
 
         room.status = 'playing';
-        
-        // 1. Daten senden zum Laden
         io.to(roomId).emit('prepareGame', { players: room.players, trapFields: room.trapFields });
         
-        // 2. Warten und dann Spiel starten
         setTimeout(() => {
-            io.to(roomId).emit('gameLive'); // Signal: Ladebildschirm weg
+            io.to(roomId).emit('gameLive');
             room.turnIndex = -1;
             nextTurn(roomId);
         }, 4000); 
@@ -127,8 +124,8 @@ io.on('connection', (socket) => {
         if (roomId && rooms[roomId]) {
             const room = rooms[roomId];
             room.players = room.players.filter(p => p.id !== socket.id);
-            
             const humans = room.players.filter(p => !p.isBot);
+            
             if (humans.length === 0) {
                 if(room.timer) clearTimeout(room.timer);
                 delete rooms[roomId];
