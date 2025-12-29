@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-bulletproof",
-  "version": "8.0.0",
-  "description": "Ludo with robust loading",
+  "name": "horror-ludo-final-fix",
+  "version": "9.0.0",
+  "description": "Ludo Fixed Libraries",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
