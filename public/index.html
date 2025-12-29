@@ -3,61 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo Reparatur</title>
+    <title>Horror Ludo Loading</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
 
         body { margin: 0; overflow: hidden; background-color: #000; color: #eee; font-family: 'Roboto', sans-serif; }
 
-        /* WICHTIG: Canvas muss existieren und ganz hinten sein */
-        #game-canvas {
-            display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0;
-        }
+        /* CANVAS */
+        #game-canvas { display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
 
+        /* HUD */
         #hud-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none;
-            display: flex; flex-direction: column; justify-content: space-between;
+            z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
         }
-
         .hud-panel {
-            background: rgba(20, 0, 0, 0.9); border: 2px solid #880000;
-            padding: 10px 20px; margin: 20px; border-radius: 8px; 
-            pointer-events: auto;
+            background: rgba(20, 0, 0, 0.9); border: 2px solid #880000; padding: 10px 20px; margin: 20px; 
+            border-radius: 8px; pointer-events: auto; box-shadow: 0 0 10px #000;
         }
-
         .top-bar { display: flex; justify-content: space-between; }
         .bottom-bar { display: flex; justify-content: center; padding-bottom: 40px; pointer-events: auto; }
-
-        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; font-size: 1.5rem;}
+        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; font-size: 1.5rem; }
         #timer-box { font-size: 3rem; color: red; font-weight: bold; text-align: right; text-shadow: 0 0 10px red; }
-        
         #status-msg {
-            background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 20px;
-            font-size: 1.5rem; border: 1px solid #444; margin-bottom: 10px; text-align: center;
-            color: #fff; text-shadow: 1px 1px 0 #000;
+            background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 20px; font-size: 1.5rem; 
+            border: 1px solid #444; margin-bottom: 10px; text-align: center; color: #fff;
         }
-
         .btn-horror {
-            background: #880000; color: white; border: 2px solid #ff0000;
-            padding: 15px 40px; font-size: 1.5rem; font-family: 'Creepster', cursive;
-            cursor: pointer; pointer-events: auto; box-shadow: 0 0 15px red; border-radius: 8px;
+            background: #880000; color: white; border: 2px solid #ff0000; padding: 15px 40px; 
+            font-size: 1.5rem; font-family: 'Creepster', cursive; cursor: pointer; pointer-events: auto; 
+            box-shadow: 0 0 15px red; border-radius: 8px; transition: 0.2s;
         }
         .btn-horror:hover { background: #aa0000; transform: scale(1.05); }
         .btn-horror:disabled { background: #333; border-color: #555; color: #777; box-shadow: none; transform: none; cursor: default;}
 
+        /* OVERLAYS */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 0, 0, 0.98); z-index: 20;
+            background: rgba(5, 0, 0, 0.98); z-index: 50;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             pointer-events: auto;
         }
         .hidden { display: none !important; }
 
         input { padding: 15px; font-size: 1.2rem; background: #222; color: white; border: 1px solid #555; margin-bottom: 20px; text-align: center; }
-        
         .quiz-opt { background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; text-align: left; }
         .quiz-opt:hover { border-color: red; background: #440000; }
+
+        /* LOADING SCREEN SPECIFIC */
+        #loading-bar-container {
+            width: 80%; max-width: 600px; height: 30px; background: #220000; 
+            border: 2px solid #660000; border-radius: 15px; margin-top: 20px; overflow: hidden;
+        }
+        #loading-bar-fill {
+            width: 0%; height: 100%; background: linear-gradient(90deg, #ff0000, #ff6600);
+            transition: width 0.3s ease-out;
+        }
+        #loading-log {
+            margin-top: 10px; color: #aaa; font-family: monospace; font-size: 1.2rem;
+        }
+        #loading-percent {
+            font-size: 2rem; color: #ff0000; font-family: 'Creepster', cursive; margin-top: 10px;
+        }
 
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -66,11 +73,10 @@
 </head>
 <body>
 
-    <!-- CANVAS FEST INTEGRIERT -->
     <canvas id="game-canvas"></canvas>
 
     <!-- HUD -->
-    <div id="hud-layer">
+    <div id="hud-layer" class="hidden">
         <div class="top-bar">
             <div class="hud-panel" id="identity">
                 <small style="color:#aaa">Rolle:</small>
@@ -85,7 +91,7 @@
         </div>
         <div class="bottom-bar">
             <div style="text-align:center;">
-                <div id="status-msg">Warte auf Spielstart...</div>
+                <div id="status-msg">Spiel startet...</div>
                 <button id="btn-action" class="btn-horror" style="display:none;" onclick="game.roll()">WÜRFELN</button>
             </div>
         </div>
@@ -103,8 +109,18 @@
     <div id="lobby-screen" class="overlay hidden">
         <h1 style="color:red; font-family:'Creepster'">Die Lobby</h1>
         <div id="lobby-list" style="font-size:1.5rem; margin-bottom:30px; text-align:center;"></div>
-        <p style="color:#aaa">Warte auf weitere Spieler...</p>
-        <button id="btn-start" class="btn-horror" onclick="start()" disabled>WARTEN...</button>
+        <p style="color:#aaa" id="lobby-wait-text">Warte auf weitere Spieler...</p>
+        <button id="btn-start" class="btn-horror" onclick="start()" disabled>WARTEN AUF HOST...</button>
+    </div>
+
+    <!-- LOADING SCREEN -->
+    <div id="loading-screen" class="overlay hidden">
+        <h1 style="color:red; font-family:'Creepster'">Beschwöre Spielwelt...</h1>
+        <div id="loading-percent">0%</div>
+        <div id="loading-bar-container">
+            <div id="loading-bar-fill"></div>
+        </div>
+        <div id="loading-log">Verbinde mit Server...</div>
     </div>
 
     <div id="quiz-screen" class="overlay hidden">
@@ -119,9 +135,10 @@
         const COLORS = { red: 0xaa0000, blue: 0x0000aa, green: 0x006600, yellow: 0xdddd00 };
         const QUESTIONS = [{q:"Killer in Halloween?", a:["Michael","Jason","Freddy"], c:0}, {q:"Regisseur Psycho?", a:["Hitchcock","Spielberg","Lucas"], c:0}];
 
-        let myData = { color:null, figure:null };
+        let myData = { color:null, figure:null, isHost:false };
         let game = null;
 
+        // --- NETWORK ---
         function join() {
             const r = document.getElementById('room-input').value;
             if(r) socket.emit('joinGame', r);
@@ -139,22 +156,68 @@
             document.getElementById('lobby-screen').classList.remove('hidden');
         });
 
+        socket.on('youAreHost', () => {
+            myData.isHost = true;
+            updateLobbyButton();
+        });
+
         socket.on('lobbyUpdate', data => {
             document.getElementById('lobby-list').innerHTML = data.players.map(p => 
                 `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
             ).join('');
-            if(data.hostId === socket.id) {
-                const btn = document.getElementById('btn-start');
-                btn.disabled = false; btn.innerText = "STARTEN";
-            }
+            
+            // Check host again from packet to be safe
+            if(data.hostId === socket.id) myData.isHost = true;
+            updateLobbyButton();
         });
 
-        socket.on('gameStarted', data => {
+        function updateLobbyButton() {
+            const btn = document.getElementById('btn-start');
+            const txt = document.getElementById('lobby-wait-text');
+            if(myData.isHost) {
+                btn.disabled = false; btn.innerText = "SPIEL STARTEN";
+                txt.innerText = "Du bist der Host. Starte, wenn alle bereit sind.";
+            } else {
+                btn.disabled = true; btn.innerText = "WARTEN AUF HOST...";
+                txt.innerText = "Der Host bereitet das Spiel vor...";
+            }
+        }
+
+        // --- LOADING LOGIC ---
+        socket.on('prepareGame', data => {
             document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('status-msg').innerText = "Spiel wird geladen...";
-            // Initialisiere Spiel sofort
-            if(!game) game = new Game3D(data);
+            document.getElementById('loading-screen').classList.remove('hidden');
+            startLoadingSequence(data);
         });
+
+        async function startLoadingSequence(data) {
+            const log = document.getElementById('loading-log');
+            const bar = document.getElementById('loading-bar-fill');
+            const pct = document.getElementById('loading-percent');
+
+            const steps = [
+                { msg: "Generiere Spielbrett...", p: 20 },
+                { msg: "Lade Texturen...", p: 40 },
+                { msg: "Baue Figuren zusammen...", p: 60 },
+                { msg: "Berechne Schatten...", p: 80 },
+                { msg: "Starte 3D Engine...", p: 90 },
+                { msg: "FERTIG!", p: 100 }
+            ];
+
+            for (let step of steps) {
+                log.innerText = step.msg;
+                bar.style.width = step.p + "%";
+                pct.innerText = step.p + "%";
+                await new Promise(r => setTimeout(r, 400)); // Künstliche Pause für Effekt
+            }
+
+            // Wenn fertig, Engine starten
+            if(!game) game = new Game3D(data);
+            
+            // UI Switch
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('hud-layer').classList.remove('hidden');
+        }
 
         socket.on('errorMsg', msg => alert(msg));
 
@@ -167,15 +230,13 @@
                 this.scene.background = new THREE.Color(0x050505);
                 
                 this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 55, 45); // Kamera etwas höher
+                this.camera.position.set(0, 55, 45);
                 this.camera.lookAt(0,0,0);
 
-                // NUTZE VORHANDENES CANVAS
-                const canvas = document.getElementById('game-canvas');
-                this.renderer = new THREE.WebGLRenderer({antialias:true, canvas: canvas});
+                const cvs = document.getElementById('game-canvas');
+                this.renderer = new THREE.WebGLRenderer({antialias:true, canvas:cvs});
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                
-                // Licht
+
                 this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
                 const dir = new THREE.DirectionalLight(0xffffff, 0.8);
                 dir.position.set(20,50,20); dir.castShadow=true;
@@ -188,15 +249,9 @@
 
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.raycaster = new THREE.Raycaster();
-                
-                // Click Event
-                canvas.addEventListener('click', e => this.click(e));
+                cvs.addEventListener('click', e => this.click(e));
 
-                this.active = {};
-                this.rolled = null;
-                this.rollCount = 0;
-                this.tmr = null;
-
+                this.active = {}; this.rolled = null; this.rollCount = 0; this.tmr = null;
                 this.socketListeners();
                 this.loop();
             }
@@ -215,17 +270,18 @@
                     this.timer(d.timeout);
 
                     const btn = document.getElementById('btn-action');
+                    const msg = document.getElementById('status-msg');
+                    
                     if(d.activeColor === myData.color) {
-                        document.getElementById('status-msg').innerText = "DU BIST DRAN!";
-                        document.getElementById('status-msg').style.color = "#0f0";
+                        msg.innerText = "DU BIST DRAN!";
+                        msg.style.color = "#0f0";
                         btn.style.display = 'inline-block';
                         btn.innerText = "WÜRFELN";
                     } else {
-                        document.getElementById('status-msg').innerText = d.activeName + " ist dran...";
-                        document.getElementById('status-msg').style.color = "#fff";
+                        msg.innerText = d.activeName + " ist dran...";
+                        msg.style.color = "#fff";
                         btn.style.display = 'none';
                     }
-                    // Bot logic
                     if(d.isBot && myData.isHost) setTimeout(()=>socket.emit('rollDice', {roomId:document.getElementById('room-input').value}), 1500);
                 });
 
@@ -248,21 +304,21 @@
             handleRoll(val) {
                 this.rolled = val; this.rollCount++;
                 const btn = document.getElementById('btn-action');
+                const msg = document.getElementById('status-msg');
                 btn.style.display = 'none';
-                document.getElementById('status-msg').innerText = "Gewürfelt: " + val;
+                msg.innerText = "Gewürfelt: " + val;
 
                 const myPs = this.pieces.filter(p => p.col === myData.color);
                 const allHome = myPs.every(p => p.pos === -1);
 
                 if(allHome) {
                     if(val === 6) {
-                        document.getElementById('status-msg').innerText = "6! Ziehe raus!";
+                        msg.innerText = "Eine 6! Ziehe raus!";
                     } else {
                         if(this.rollCount < 3) {
-                            document.getElementById('status-msg').innerText = "Versuch " + this.rollCount + "/3. Nochmal!";
+                            msg.innerText = `Keine 6. Versuch ${this.rollCount}/3.`;
                             btn.style.display = 'inline-block'; btn.innerText = "NOCHMAL";
-                            this.rolled = null; 
-                            return;
+                            this.rolled = null; return;
                         } else {
                             setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
                         }
@@ -271,7 +327,7 @@
                 
                 if(!this.canMove()) {
                     setTimeout(() => {
-                        document.getElementById('status-msg').innerText = "Kein Zug möglich.";
+                        msg.innerText = "Kein Zug möglich.";
                         setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
                     }, 1000);
                 }
@@ -315,8 +371,8 @@
                 if(this.rolled===6) {
                     this.rolled=null; this.rollCount=0;
                     document.getElementById('status-msg').innerText="6! Nochmal!";
-                    document.getElementById('btn-action').style.display='inline-block';
-                    document.getElementById('btn-action').innerText="WÜRFELN";
+                    const btn = document.getElementById('btn-action');
+                    btn.style.display='inline-block'; btn.innerText="WÜRFELN";
                 } else socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
             }
 
@@ -356,23 +412,22 @@
             loop() { requestAnimationFrame(()=>this.loop()); this.controls.update(); this.renderer.render(this.scene,this.camera); }
         }
 
-        // --- MODELS ---
+        // --- PIECES ---
         class Piece {
             constructor(c,i,s,b) {
                 this.col=c; this.idx=i; this.board=b; this.pos=-1;
                 this.mesh=new THREE.Group(); this.mesh.userData={p:this};
                 const mat = new THREE.MeshStandardMaterial({color:COLORS[c]});
-                
-                if(c==='red') { 
+                if(c==='red') {
                     this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7,1.5,16), mat).translateY(0.75));
                     this.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color:0xffcccc})).translateY(1.6));
-                } else if(c==='blue') { 
+                } else if(c==='blue') {
                     this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.4,2,0.3), mat).translateY(1));
                     this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1.4,0.3,0.3), mat).translateY(1.3));
-                } else if(c==='green') { 
+                } else if(c==='green') {
                     this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.4), mat).translateY(0.75));
                     this.mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.4,16), mat).rotateX(Math.PI/2).translateY(1.5));
-                } else { 
+                } else {
                     const gm = new THREE.MeshStandardMaterial({color:COLORS[c], transparent:true, opacity:0.7});
                     this.mesh.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5,1,4,8), gm).translateY(1));
                 }
@@ -396,11 +451,9 @@
             mk() {
                 const p = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x221111}));
                 p.position.y=-0.6; p.receiveShadow=true; this.s.add(p);
-                
                 for(let i=0; i<40; i++) {
                     let col = this.traps.includes(i) ? 0xaa00aa : 0x444444;
                     if(i===0) col=COLORS.red; if(i===10) col=COLORS.blue; if(i===20) col=COLORS.green; if(i===30) col=COLORS.yellow;
-                    
                     const m = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.2,2.3), new THREE.MeshStandardMaterial({color:col}));
                     m.position.copy(this.vec(i)); m.position.y=0.1; this.s.add(m);
                     if(this.traps.includes(i)) {
