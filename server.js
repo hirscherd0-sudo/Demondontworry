@@ -45,7 +45,6 @@ function nextTurn(roomId) {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (roomId) => {
-        // Aufräumen
         if (rooms[roomId] && rooms[roomId].players.filter(p => !p.isBot).length === 0) {
             delete rooms[roomId];
         }
@@ -66,13 +65,13 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
 
         if (room.status === 'playing') {
-            socket.emit('errorMsg', 'Spiel läuft bereits!');
+            socket.emit('errorMsg', 'Spiel läuft bereits! Warte bis es vorbei ist oder wähle einen neuen Raum.');
             return;
         }
 
         if (room.players.length < 4) {
             const colors = ['red', 'blue', 'green', 'yellow'];
-            const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
+            const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
             const c = colors[room.players.length];
             
             const p = { id: socket.id, color: c, isBot: false, name: `Spieler ${room.players.length + 1}`, figure: figures[c] };
@@ -81,7 +80,7 @@ io.on('connection', (socket) => {
             socket.emit('setIdentity', { color: c, figure: figures[c], isHost: room.host === socket.id });
             io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
         } else {
-            socket.emit('errorMsg', 'Raum voll!');
+            socket.emit('errorMsg', 'Raum ist voll!');
         }
     });
 
@@ -90,20 +89,21 @@ io.on('connection', (socket) => {
         if(!room || room.host !== socket.id) return;
 
         const colors = ['red', 'blue', 'green', 'yellow'];
-        const figures = {'red': 'Puppe', 'blue': 'Kreuz', 'green': 'Grabstein', 'yellow': 'Geist'};
+        const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
         while(room.players.length < 4) {
             const c = colors[room.players.length];
             room.players.push({ id: 'BOT_'+Math.random(), color: c, isBot: true, name: 'Bot', figure: figures[c] });
         }
 
         room.status = 'playing';
-        io.to(roomId).emit('gameStarted', { players: room.players, trapFields: room.trapFields });
+        // Wir senden "prepareGame" statt sofort loszulegen, damit Clients laden können
+        io.to(roomId).emit('prepareGame', { players: room.players, trapFields: room.trapFields });
         
-        // WICHTIG: Verzögerung damit Clients laden können
+        // Kurze Verzögerung auf Server-Seite, dann erster Zug
         setTimeout(() => {
             room.turnIndex = -1;
             nextTurn(roomId);
-        }, 1000);
+        }, 3000); // 3 Sekunden Puffer für Ladebildschirm der Clients
     });
 
     socket.on('rollDice', ({ roomId }) => {
@@ -126,16 +126,18 @@ io.on('connection', (socket) => {
         if (roomId && rooms[roomId]) {
             const room = rooms[roomId];
             room.players = room.players.filter(p => p.id !== socket.id);
-            if (room.players.filter(p => !p.isBot).length === 0) {
+            
+            const humans = room.players.filter(p => !p.isBot);
+            if (humans.length === 0) {
                 if(room.timer) clearTimeout(room.timer);
                 delete rooms[roomId];
             } else {
                 if(room.host === socket.id) {
-                     const next = room.players.find(p=>!p.isBot);
-                     if(next) { room.host = next.id; io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host }); }
-                } else {
-                    io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
+                     room.host = humans[0].id;
+                     const s = io.sockets.sockets.get(room.host);
+                     if(s) s.emit('youAreHost');
                 }
+                io.to(roomId).emit('lobbyUpdate', { players: room.players, hostId: room.host });
             }
         }
         delete socketRoomMap[socket.id];
