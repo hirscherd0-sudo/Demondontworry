@@ -2,367 +2,256 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo Final</title>
+    <title>Horror Ludo Master</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
+        body { margin: 0; overflow: hidden; background: #050505; color: #eee; font-family: 'Roboto'; }
+        #game-canvas { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
+        
+        /* UI */
+        #ui-layer { position: absolute; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
+        .panel { background: rgba(20,0,0,0.9); border: 2px solid #800; padding: 15px; margin: 15px; border-radius: 8px; pointer-events: auto; }
+        .top { display: flex; justify-content: space-between; }
+        h2 { font-family: 'Creepster'; margin: 0; color: #f00; letter-spacing: 1px; }
+        
+        .btn { background: #900; color: white; border: 2px solid #f00; padding: 15px 40px; font-family: 'Creepster'; font-size: 1.5rem; cursor: pointer; pointer-events: auto; box-shadow: 0 0 15px #f00; border-radius: 5px; }
+        .btn:hover { background: #b00; transform: scale(1.05); }
+        .btn:disabled { background: #333; border-color: #555; color: #777; box-shadow: none; transform: none; cursor: default; }
 
-        body { margin: 0; overflow: hidden; background-color: #000; color: #eee; font-family: 'Roboto', sans-serif; }
-
-        #game-canvas { display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
-
-        #hud-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
-        }
-        .hud-panel {
-            background: rgba(20, 0, 0, 0.9); border: 2px solid #880000; padding: 10px 20px; margin: 20px; 
-            border-radius: 8px; pointer-events: auto; box-shadow: 0 0 10px #000;
-        }
-        .top-bar { display: flex; justify-content: space-between; }
-        .bottom-bar { display: flex; justify-content: center; padding-bottom: 40px; pointer-events: auto; }
-        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; font-size: 1.5rem; }
-        #timer-box { font-size: 3rem; color: red; font-weight: bold; text-align: right; text-shadow: 0 0 10px red; }
-        #status-msg {
-            background: rgba(0,0,0,0.8); padding: 10px 30px; border-radius: 20px; font-size: 1.5rem; 
-            border: 1px solid #444; margin-bottom: 10px; text-align: center; color: #fff;
-        }
-        .btn-horror {
-            background: #880000; color: white; border: 2px solid #ff0000; padding: 15px 40px; 
-            font-size: 1.5rem; font-family: 'Creepster', cursive; cursor: pointer; pointer-events: auto; 
-            box-shadow: 0 0 15px red; border-radius: 8px; transition: 0.2s;
-        }
-        .btn-horror:hover { background: #aa0000; transform: scale(1.05); }
-        .btn-horror:disabled { background: #333; border-color: #555; color: #777; box-shadow: none; transform: none; cursor: default;}
-
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 0, 0, 0.98); z-index: 50;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            pointer-events: auto;
-        }
+        /* Overlays */
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5,0,0,0.98); z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: auto; }
         .hidden { display: none !important; }
-
-        input { padding: 15px; font-size: 1.2rem; background: #222; color: white; border: 1px solid #555; margin-bottom: 20px; text-align: center; }
-        .quiz-opt { background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; text-align: left; }
-        .quiz-opt:hover { border-color: red; background: #440000; }
-
-        #loading-bar-container {
-            width: 80%; max-width: 600px; height: 30px; background: #220000; 
-            border: 2px solid #660000; border-radius: 15px; margin-top: 20px; overflow: hidden;
-        }
-        #loading-bar-fill {
-            width: 0%; height: 100%; background: linear-gradient(90deg, #ff0000, #ff6600);
-            transition: width 0.3s ease-out;
-        }
-        #loading-log { margin-top: 10px; color: #aaa; font-family: monospace; font-size: 1rem; height: 20px;}
-        #loading-percent { font-size: 2rem; color: #ff0000; font-family: 'Creepster', cursive; margin-top: 10px; }
-        #force-start-btn { margin-top: 20px; font-size: 1rem; padding: 10px 20px; display: none; }
-
+        input { padding: 10px; background: #222; border: 1px solid #555; color: white; margin-bottom: 20px; font-size: 1.2rem; text-align: center; }
+        
+        /* Loading */
+        #load-bar { width: 300px; height: 20px; background: #300; border: 1px solid #600; margin-top: 10px; }
+        #load-fill { width: 0%; height: 100%; background: #f00; transition: width 0.3s; }
+        
+        /* Quiz */
+        .q-opt { background: #222; padding: 15px; width: 300px; margin: 5px; border: 1px solid #555; cursor: pointer; text-align: left; }
+        .q-opt:hover { border-color: #f00; background: #400; }
     </style>
-    
-    <!-- LIBRARIES (R146) -->
+    <!-- LIBS -->
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-
     <canvas id="game-canvas"></canvas>
 
-    <!-- HUD -->
-    <div id="hud-layer" class="hidden">
-        <div class="top-bar">
-            <div class="hud-panel" id="identity">
-                <small style="color:#aaa">Rolle:</small>
-                <h2 id="my-name">---</h2>
-                <div id="my-dot" style="width:100%; height:5px; background:gray;"></div>
+    <div id="ui-layer" class="hidden">
+        <div class="top">
+            <div class="panel">
+                <small style="color:#aaa">Du bist:</small>
+                <h2 id="p-name">---</h2>
             </div>
-            <div class="hud-panel" id="turn-info" style="text-align:right;">
+            <div class="panel" style="text-align:right">
                 <small style="color:#aaa">Am Zug:</small>
-                <h2 id="turn-name" style="color:gold">---</h2>
-                <div id="timer-box">20</div>
+                <h2 id="t-name" style="color:gold">---</h2>
+                <div id="timer" style="font-size:3rem; color:red; font-weight:bold; line-height:1">20</div>
             </div>
         </div>
-        <div class="bottom-bar">
-            <div style="text-align:center;">
-                <div id="status-msg">Spiel startet...</div>
-                <button id="btn-action" class="btn-horror" style="display:none;" onclick="tryRoll()">WÜRFELN</button>
-            </div>
+        <div style="text-align:center; padding-bottom:30px;">
+            <div id="msg" class="panel" style="display:inline-block; font-size:1.5rem; margin-bottom:10px;">Warte...</div><br>
+            <button id="btn-roll" class="btn" style="display:none" onclick="app.roll()">WÜRFELN</button>
         </div>
     </div>
 
-    <!-- SCREENS -->
-    <div id="login-screen" class="overlay">
-        <h1 style="font-family:'Creepster'; font-size:5rem; color:red; margin:0;">HORROR LUDO</h1>
-        <p style="color:#888;">Complete Edition</p>
-        <br>
-        <input type="text" id="room-input" placeholder="Raum Name">
-        <button class="btn-horror" onclick="join()">BEITRETEN</button>
+    <div id="s-login" class="screen">
+        <h1 style="font-family:'Creepster'; font-size:5rem; color:#c00; margin:0; text-shadow:0 0 20px #000">HORROR LUDO</h1>
+        <p style="color:#888">Original Regeln</p>
+        <input type="text" id="inp-room">
+        <button class="btn" onclick="app.join()">BEITRETEN</button>
     </div>
 
-    <div id="lobby-screen" class="overlay hidden">
-        <h1 style="color:red; font-family:'Creepster'">Die Lobby</h1>
-        <div id="lobby-list" style="font-size:1.5rem; margin-bottom:30px; text-align:center;"></div>
-        <p style="color:#aaa" id="lobby-wait-text">Warte auf weitere Spieler...</p>
-        <button id="btn-start" class="btn-horror" onclick="start()" disabled>WARTEN AUF HOST...</button>
+    <div id="s-lobby" class="screen hidden">
+        <h1 style="font-family:'Creepster'; color:#c00">Lobby</h1>
+        <div id="list" style="font-size:1.5rem; margin-bottom:20px; text-align:center;"></div>
+        <button id="btn-start" class="btn" disabled onclick="app.start()">WARTE AUF HOST...</button>
     </div>
 
-    <div id="loading-screen" class="overlay hidden">
-        <h1 style="color:red; font-family:'Creepster'">Lade Welt...</h1>
-        <div id="loading-percent">0%</div>
-        <div id="loading-bar-container">
-            <div id="loading-bar-fill"></div>
-        </div>
-        <div id="loading-log">Init...</div>
-        <button id="force-start-btn" class="btn-horror" onclick="forceGameStart()">TROTZDEM STARTEN</button>
+    <div id="s-load" class="screen hidden">
+        <h2 style="font-family:'Creepster'; color:#c00">Beschwöre Brett...</h2>
+        <div id="load-bar"><div id="load-fill"></div></div>
+        <div id="load-txt" style="color:#888; margin-top:5px;">Init...</div>
     </div>
 
-    <div id="quiz-screen" class="overlay hidden">
-        <h2 style="color:red; font-family:'Creepster'">Todesfrage</h2>
-        <p id="q-text" style="font-size:1.5rem;">?</p>
-        <div id="q-opts"></div>
+    <div id="s-quiz" class="screen hidden">
+        <h2 style="font-family:'Creepster'; color:#c00">Todesfrage</h2>
+        <p id="q-txt" style="font-size:1.5rem">?</p>
+        <div id="q-box"></div>
     </div>
 
     <script>
-        // GLOBAL SCOPE WRAPPER
-        let socket, game;
-        let myData = { color:null, figure:null, isHost:false };
-        const COLORS = { red: 0xaa0000, blue: 0x0000aa, green: 0x006600, yellow: 0xdddd00 };
-        const QUESTIONS = [{q:"Killer in Halloween?", a:["Michael","Jason","Freddy"], c:0}, {q:"Regisseur Psycho?", a:["Hitchcock","Spielberg","Lucas"], c:0}];
-
-        // WICHTIG: Alles erst ausführen, wenn Libraries da sind
-        window.onload = function() {
-            if (typeof THREE === 'undefined') {
-                alert("FEHLER: 3D Engine konnte nicht geladen werden. Bitte Adblocker prüfen.");
-                return;
-            }
-            if (typeof io === 'undefined') {
-                alert("FEHLER: Socket.io konnte nicht geladen werden.");
-                return;
-            }
-
-            initApp();
+        const socket = io();
+        const C = { red:0xcc0000, blue:0x0000cc, green:0x006600, yellow:0xdddd00, dark:0x111111, path:0x444444 };
+        const Q = [{q:"Regisseur Psycho?", a:["Hitchcock","Spielberg"], c:0}, {q:"Killer Halloween?", a:["Michael","Jason"], c:0}];
+        let me = { col:null, host:false };
+        
+        window.onload = () => {
+            document.getElementById('inp-room').value = "Grab_" + Math.floor(Math.random()*999);
+            if(!window.app) window.app = new App();
         };
 
-        function initApp() {
-            document.getElementById('room-input').value = "Friedhof_" + Math.floor(Math.random()*1000);
-            socket = io();
-
-            socket.on('setIdentity', data => {
-                myData = data;
-                document.getElementById('my-name').innerText = data.figure;
-                document.getElementById('my-name').style.color = '#'+COLORS[data.color].toString(16);
-                document.getElementById('my-dot').style.background = '#'+COLORS[data.color].toString(16);
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('lobby-screen').classList.remove('hidden');
-            });
-
-            socket.on('youAreHost', () => { myData.isHost=true; updateLobby(); });
-
-            socket.on('lobbyUpdate', data => {
-                document.getElementById('lobby-list').innerHTML = data.players.map(p => 
-                    `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
-                ).join('');
-                if(data.hostId === socket.id) myData.isHost = true;
-                updateLobby();
-            });
-
-            socket.on('prepareGame', data => {
-                document.getElementById('lobby-screen').classList.add('hidden');
-                document.getElementById('loading-screen').classList.remove('hidden');
-                runLoader(data);
-            });
-
-            socket.on('gameLive', () => {
-                document.getElementById('loading-screen').classList.add('hidden');
-                document.getElementById('hud-layer').classList.remove('hidden');
-            });
-
-            socket.on('errorMsg', msg => alert(msg));
-        }
-
-        // Global functions for buttons
-        function join() {
-            const r = document.getElementById('room-input').value;
-            if(r) socket.emit('joinGame', r);
-        }
-        function start() {
-            socket.emit('requestStartGame', document.getElementById('room-input').value);
-        }
-        function tryRoll() {
-            if(game) game.roll();
-        }
-        function forceGameStart() {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('hud-layer').classList.remove('hidden');
-        }
-        function updateLobby() {
-            const btn = document.getElementById('btn-start');
-            if(myData.isHost) {
-                btn.disabled=false; btn.innerText="SPIEL STARTEN";
-                document.getElementById('lobby-wait-text').innerText = "Du bist Host.";
+        class App {
+            constructor() {
+                this.scene=null; this.game=null;
+                this.bindSocket();
             }
-        }
+            join() { socket.emit('joinGame', document.getElementById('inp-room').value); }
+            start() { socket.emit('requestStartGame', document.getElementById('inp-room').value); }
+            roll() { socket.emit('rollDice', {roomId:document.getElementById('inp-room').value}); }
 
-        async function runLoader(data) {
-            const l = document.getElementById('loading-log');
-            const b = document.getElementById('loading-bar-fill');
-            const p = document.getElementById('loading-percent');
-            
-            try {
-                const steps = [{m:"Generiere Board...", v:30}, {m:"Erstelle Figuren...", v:70}, {m:"Fertig...", v:100}];
-                for(let s of steps) {
-                    l.innerText = s.m; b.style.width=s.v+"%"; p.innerText=s.v+"%";
-                    await new Promise(r=>setTimeout(r, 500));
-                }
-                if(!game) game = new Game3D(data);
-                l.innerText = "Warte auf Server...";
+            bindSocket() {
+                socket.on('setIdentity', d => {
+                    me.col = d.color;
+                    document.getElementById('p-name').innerText = d.figure;
+                    document.getElementById('p-name').style.color = '#'+C[d.color].toString(16);
+                    this.sw('s-lobby');
+                });
+                socket.on('youAreHost', ()=>{ me.host=true; this.updLobby(); });
+                socket.on('lobbyUpdate', d => {
+                    document.getElementById('list').innerHTML = d.players.map(p=>`<div style="color:${p.color}">${p.name}</div>`).join('');
+                    if(d.hostId===socket.id) me.host=true;
+                    this.updLobby();
+                });
+                socket.on('prepareGame', d => { this.sw('s-load'); this.load(d); });
+                socket.on('gameLive', () => { this.sw('ui-layer'); });
+                socket.on('errorMsg', m => alert(m));
                 
-                setTimeout(() => document.getElementById('force-start-btn').style.display='block', 3000);
-            } catch(e) {
-                l.innerText = "FEHLER: " + e.message;
-                l.style.color = "red";
-                console.error(e);
+                // Game Events
+                socket.on('turnChanged', d => { if(this.game) this.game.onTurn(d); });
+                socket.on('statusMessage', d => document.getElementById('msg').innerText = d.msg);
+                socket.on('diceRolled', d => { if(this.game) this.game.onRoll(d); });
+                socket.on('pieceMoved', d => { if(this.game) this.game.onMove(d); });
+            }
+
+            sw(id) {
+                ['s-login','s-lobby','s-load','s-quiz','ui-layer'].forEach(x=>document.getElementById(x).classList.add('hidden'));
+                document.getElementById(id).classList.remove('hidden');
+            }
+            updLobby() {
+                const b = document.getElementById('btn-start');
+                if(me.host) { b.disabled=false; b.innerText="SPIEL STARTEN"; }
+            }
+            async load(data) {
+                const b = document.getElementById('load-fill');
+                const t = document.getElementById('load-txt');
+                const steps = ["Brett konstruieren...", "Figuren beleben...", "Licht entzünden..."];
+                for(let i=0; i<steps.length; i++) {
+                    t.innerText = steps[i]; b.style.width = ((i+1)*33)+"%";
+                    await new Promise(r=>setTimeout(r, 600));
+                }
+                this.game = new Game(data);
             }
         }
 
-        // --- ENGINE ---
-        class Game3D {
+        class Game {
             constructor(data) {
-                try {
-                    this.players = data.players;
-                    this.scene = new THREE.Scene();
-                    this.scene.background = new THREE.Color(0x050505);
-                    
-                    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-                    this.camera.position.set(0, 55, 45);
-                    this.camera.lookAt(0,0,0);
+                this.d = data;
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x050000);
+                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 50, 40); this.camera.lookAt(0,0,0);
+                
+                this.renderer = new THREE.WebGLRenderer({canvas:document.getElementById('game-canvas'), antialias:true});
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                
+                this.ray = new THREE.Raycaster();
+                this.renderer.domElement.addEventListener('click', e => this.click(e));
 
-                    const cvs = document.getElementById('game-canvas');
-                    this.renderer = new THREE.WebGLRenderer({antialias:true, canvas:cvs});
-                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                // Licht
+                this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+                const l = new THREE.DirectionalLight(0xffffff, 0.8); l.position.set(20,50,20); l.castShadow=true; this.scene.add(l);
 
-                    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-                    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-                    dir.position.set(20,50,20); dir.castShadow=true;
-                    this.scene.add(dir);
-
-                    this.board = new Board(this.scene, data.trapFields);
-                    this.dice = new Dice(this.scene);
-                    this.pieces = [];
-                    this.initPieces();
-
-                    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-                    this.raycaster = new THREE.Raycaster();
-                    cvs.addEventListener('click', e => this.click(e));
-
-                    this.active = {}; this.rolled = null; this.rollCount = 0; this.tmr = null;
-                    this.socketListeners();
-                    this.loop();
-                } catch(e) {
-                    console.error("Game Init Failed:", e);
-                    throw e;
-                }
-            }
-
-            initPieces() {
+                this.board = new Board(this.scene, data.trapFields);
+                this.dice = new Dice(this.scene);
+                this.pieces = [];
                 ['red','blue','green','yellow'].forEach(c => {
                     for(let i=0;i<4;i++) this.pieces.push(new Piece(c,i,this.scene,this.board));
                 });
+
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.loop();
+
+                this.active = {}; this.rolled = null; this.rollCount = 0; this.tmr=null;
             }
 
-            socketListeners() {
-                socket.on('turnChanged', d => {
-                    this.active = d; this.rolled = null; this.rollCount = 0;
-                    document.getElementById('turn-name').innerText = d.activeName;
-                    document.getElementById('turn-name').style.color = '#'+COLORS[d.activeColor].toString(16);
-                    this.timer(d.timeout);
+            onTurn(d) {
+                this.active = d; this.rolled = null; this.rollCount = 0;
+                document.getElementById('t-name').innerText = d.activeName;
+                document.getElementById('t-name').style.color = '#'+C[d.activeColor].toString(16);
+                
+                if(this.tmr) clearInterval(this.tmr);
+                let t = 20; document.getElementById('timer').innerText=t;
+                this.tmr = setInterval(()=>{ t--; document.getElementById('timer').innerText=t; if(t<=0)clearInterval(this.tmr); }, 1000);
 
-                    document.getElementById('loading-screen').classList.add('hidden');
-                    document.getElementById('hud-layer').classList.remove('hidden');
+                const btn = document.getElementById('btn-roll');
+                const msg = document.getElementById('msg');
+                if(d.activeColor === me.col) {
+                    msg.innerText = "DU BIST DRAN!"; msg.style.color="#0f0";
+                    btn.style.display = "inline-block"; btn.innerText="WÜRFELN"; btn.disabled=false;
+                } else {
+                    msg.innerText = d.activeName + " ist dran..."; msg.style.color="#fff";
+                    btn.style.display = "none";
+                }
+            }
 
-                    const btn = document.getElementById('btn-action');
-                    const msg = document.getElementById('status-msg');
-                    
-                    if(d.activeColor === myData.color) {
-                        msg.innerText = "DU BIST DRAN!";
-                        msg.style.color = "#0f0";
-                        btn.style.display = 'inline-block';
-                        btn.innerText = "WÜRFELN";
-                    } else {
-                        msg.innerText = d.activeName + " ist dran...";
-                        msg.style.color = "#fff";
-                        btn.style.display = 'none';
-                    }
-                    if(d.isBot && myData.isHost) setTimeout(()=>socket.emit('rollDice', {roomId:document.getElementById('room-input').value}), 1500);
-                });
-
-                socket.on('statusMessage', d => document.getElementById('status-msg').innerText = d.msg);
-
-                socket.on('diceRolled', d => {
-                    clearInterval(this.tmr); document.getElementById('timer-box').innerText="-";
-                    this.dice.anim(d.value, () => {
-                        if(d.playerId === socket.id) this.handleRoll(d.value);
-                        else document.getElementById('status-msg').innerText = this.active.activeName + " würfelt " + d.value;
-                    });
-                });
-
-                socket.on('pieceMoved', d => {
-                    const p = this.pieces.find(pc => pc.col===this.active.activeColor && pc.idx===d.pieceId);
-                    if(p) { p.move(d.newPosition); this.checkKill(p); }
+            onRoll(d) {
+                this.dice.roll(d.value, () => {
+                    if(d.playerId === socket.id) this.handleMyRoll(d.value);
+                    else document.getElementById('msg').innerText = this.active.activeName + " würfelt " + d.value;
                 });
             }
 
-            handleRoll(val) {
-                this.rolled = val; this.rollCount++;
-                const btn = document.getElementById('btn-action');
-                const msg = document.getElementById('status-msg');
-                btn.style.display = 'none';
-                msg.innerText = "Gewürfelt: " + val;
+            handleMyRoll(v) {
+                this.rolled = v; this.rollCount++;
+                const msg = document.getElementById('msg');
+                const btn = document.getElementById('btn-roll');
+                btn.style.display="none";
+                msg.innerText = "Gewürfelt: " + v;
 
-                const myPs = this.pieces.filter(p => p.col === myData.color);
-                const allHome = myPs.every(p => p.pos === -1);
+                const myPs = this.pieces.filter(p=>p.c===me.col);
+                const allHome = myPs.every(p=>p.pos===-1);
 
                 if(allHome) {
-                    if(val === 6) {
-                        msg.innerText = "Eine 6! Ziehe raus!";
-                    } else {
-                        if(this.rollCount < 3) {
-                            msg.innerText = `Keine 6. Versuch ${this.rollCount}/3.`;
-                            btn.style.display = 'inline-block'; btn.innerText = "NOCHMAL";
-                            this.rolled = null; return;
+                    if(v===6) { msg.innerText="6! Tippe eine Figur an!"; }
+                    else {
+                        if(this.rollCount<3) {
+                            msg.innerText=`Keine 6. Versuch ${this.rollCount}/3.`;
+                            btn.style.display="inline-block"; btn.innerText="NOCHMAL";
+                            this.rolled=null;
                         } else {
-                            setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
+                            setTimeout(()=>socket.emit('endTurn', {roomId:document.getElementById('inp-room').value}), 1500);
                         }
                     }
-                }
-                
-                if(!this.canMove()) {
-                    setTimeout(() => {
-                        msg.innerText = "Kein Zug möglich.";
-                        setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
-                    }, 1000);
+                } else {
+                    if(!this.canMove()) {
+                        msg.innerText="Kein Zug möglich.";
+                        setTimeout(()=>socket.emit('endTurn', {roomId:document.getElementById('inp-room').value}), 1500);
+                    } else {
+                        msg.innerText="Wähle eine Figur!";
+                    }
                 }
             }
 
             canMove() {
-                return this.pieces.filter(p=>p.col===myData.color).some(p => {
+                return this.pieces.filter(p=>p.c===me.col).some(p=>{
                     if(p.pos===-1) return this.rolled===6;
                     return p.pos+this.rolled<=43;
                 });
             }
 
-            roll() { socket.emit('rollDice', {roomId:document.getElementById('room-input').value}); }
-
             click(e) {
-                if(!this.rolled || this.active.activeColor!==myData.color) return;
+                if(!this.rolled || this.active.activeColor!==me.col) return;
                 const m = new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
-                this.raycaster.setFromCamera(m, this.camera);
-                const hits = this.raycaster.intersectObjects(this.scene.children, true);
+                this.ray.setFromCamera(m, this.camera);
+                const hits = this.ray.intersectObjects(this.scene.children, true);
                 for(let h of hits) {
-                    let o = h.object; while(o.parent && !o.userData.p) o=o.parent;
-                    if(o.userData.p && o.userData.p.col===myData.color) {
+                    let o = h.object;
+                    // Traverse up to find userData
+                    while(o.parent && !o.userData.p) o = o.parent;
+                    if(o.userData.p && o.userData.p.c === me.col) {
                         this.tryMove(o.userData.p); return;
                     }
                 }
@@ -373,166 +262,195 @@
                 if(p.pos===-1) { if(this.rolled===6) n=0; else return; }
                 else { n=p.pos+this.rolled; if(n>43) return; }
 
-                const abs = this.board.abs(n, myData.color);
-                socket.emit('movePiece', {roomId:document.getElementById('room-input').value, pieceId:p.idx, newPosition:n});
+                const abs = this.board.getAbs(n, me.col);
+                const rm = document.getElementById('inp-room').value;
+                socket.emit('movePiece', {roomId:rm, pieceId:p.idx, newPosition:n});
                 
-                if(this.board.isTrap(abs) && n<40) this.quiz(p);
-                else this.finish();
+                if(this.board.traps.includes(abs) && n<40) this.quiz(p);
+                else this.checkSix();
             }
 
-            finish() {
+            checkSix() {
                 if(this.rolled===6) {
                     this.rolled=null; this.rollCount=0;
-                    document.getElementById('status-msg').innerText="6! Nochmal!";
-                    const btn = document.getElementById('btn-action');
-                    btn.style.display='inline-block'; btn.innerText="WÜRFELN";
-                } else socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
+                    document.getElementById('msg').innerText="6! Nochmal!";
+                    const btn = document.getElementById('btn-roll');
+                    btn.style.display="inline-block"; btn.innerText="WÜRFELN";
+                } else socket.emit('endTurn', {roomId:document.getElementById('inp-room').value});
             }
 
             quiz(p) {
-                const scr = document.getElementById('quiz-screen'); scr.classList.remove('hidden');
-                const q = QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
-                document.getElementById('q-text').innerText=q.q;
-                const div = document.getElementById('q-opts'); div.innerHTML='';
-                q.a.forEach((a,i) => {
-                    const b = document.createElement('div'); b.className='quiz-opt'; b.innerText=a;
-                    b.onclick = () => {
-                        scr.classList.add('hidden');
-                        if(i===q.c) { alert("Richtig!"); this.finish(); }
+                const q = Q[Math.floor(Math.random()*Q.length)];
+                document.getElementById('s-quiz').classList.remove('hidden');
+                document.getElementById('q-txt').innerText = q.q;
+                const b = document.getElementById('q-box'); b.innerHTML='';
+                q.a.forEach((a,i)=>{
+                    const d=document.createElement('div'); d.className='q-opt'; d.innerText=a;
+                    d.onclick=()=>{
+                        document.getElementById('s-quiz').classList.add('hidden');
+                        if(i===q.c) { alert("Richtig!"); this.checkSix(); }
                         else { 
                             alert("Falsch!"); 
-                            socket.emit('movePiece', {roomId:document.getElementById('room-input').value, pieceId:p.idx, newPosition:-1});
-                            socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
+                            socket.emit('movePiece', {roomId:document.getElementById('inp-room').value, pieceId:p.idx, newPosition:-1});
+                            socket.emit('endTurn', {roomId:document.getElementById('inp-room').value});
                         }
                     };
-                    div.appendChild(b);
+                    b.appendChild(d);
                 });
             }
 
-            checkKill(atk) {
-                if(atk.pos<0 || atk.pos>=40) return;
-                const aPos = this.board.abs(atk.pos, atk.col);
-                this.pieces.forEach(v => {
-                    if(v!==atk && v.pos>=0 && v.pos<40 && this.board.abs(v.pos, v.col)===aPos) v.move(-1);
-                });
+            onMove(d) {
+                const p = this.pieces.find(x => x.c === (d.color||this.active.activeColor) && x.idx === d.pieceId);
+                if(p) {
+                    p.move(d.newPosition);
+                    // Kill Logic Visual
+                    if(d.newPosition>=0 && d.newPosition<40) {
+                        const abs = this.board.getAbs(d.newPosition, p.c);
+                        this.pieces.forEach(v => {
+                            if(v!==p && v.pos>=0 && v.pos<40 && this.board.getAbs(v.pos, v.c)===abs) v.move(-1);
+                        });
+                    }
+                }
             }
 
-            timer(s) {
-                if(this.tmr) clearInterval(this.tmr);
-                let t=Math.floor(s); document.getElementById('timer-box').innerText=t;
-                this.tmr=setInterval(()=>{ t--; document.getElementById('timer-box').innerText=t; if(t<=0) clearInterval(this.tmr);}, 1000);
-            }
             loop() { requestAnimationFrame(()=>this.loop()); this.controls.update(); this.renderer.render(this.scene,this.camera); }
         }
 
-        // --- PIECES ---
+        class Board {
+            constructor(s, traps) { 
+                this.s = s; this.traps = traps; this.sc = 2.5;
+                this.mk(); 
+            }
+            mk() {
+                // Boden
+                const fl = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x111111}));
+                fl.position.y=-0.6; this.s.add(fl);
+
+                // Das Kreuz: 11x11 Grid. Mitte (0,0).
+                // Pfad (0-39) generieren.
+                // 0 = Start Rot (unten rechts vom Zentrum)
+                for(let i=0; i<40; i++) {
+                    let col = this.traps.includes(i) ? 0xaa00aa : 0x444444;
+                    if(i===0) col=C.red; if(i===10) col=C.blue; if(i===20) col=C.green; if(i===30) col=C.yellow;
+                    this.tile(this.getVec(i), col);
+                    if(this.traps.includes(i)) {
+                        const q = new THREE.Mesh(new THREE.BoxGeometry(0.5,1,0.5), new THREE.MeshBasicMaterial({color:0xff00ff}));
+                        const p = this.getVec(i); q.position.set(p.x, 0.5, p.z); this.s.add(q);
+                    }
+                }
+                
+                // Bases (Häuser) in den Ecken
+                this.base('red', 1, 1); this.base('blue', 1, -1); this.base('green', -1, -1); this.base('yellow', -1, 1);
+
+                // Homes (Zielfelder)
+                for(let s=1; s<=4; s++) {
+                    this.home('red', s, 0); this.home('blue', s, 1); this.home('green', s, 2); this.home('yellow', s, 3);
+                }
+            }
+            tile(p, c) {
+                const m = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.2, 32), new THREE.MeshStandardMaterial({color:c}));
+                m.position.set(p.x, 0.1, p.z); this.s.add(m);
+            }
+            base(c, dx, dz) {
+                // 4 Felder in der Ecke. 
+                // Center ist ca 15 Einheiten weit weg.
+                const ox = 12 * dx; const oz = 12 * dz;
+                const mat = new THREE.MeshStandardMaterial({color:C[c]});
+                // 2x2 Grid
+                for(let i=0; i<2; i++) for(let j=0; j<2; j++) {
+                    const m = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.2, 32), mat);
+                    m.position.set((ox + i*3*dx)*this.sc/2.5, 0.1, (oz + j*3*dz)*this.sc/2.5); // Scaled
+                    this.s.add(m);
+                }
+            }
+            home(c, step, rot) {
+                // Schritt 1-4 zur Mitte (0,0) von Arm-Eingang
+                // Eingang ist Distanz 5. Mitte ist 0.
+                const dist = (5-step) * this.sc;
+                const v = this.rot(0, dist, rot);
+                this.tile(v, C[c]);
+            }
+            getVec(i) {
+                // 0-9 Segment (Rot, Unten)
+                // 0 is Start (Rechts vom Arm, unten) -> (1, 5) * Scale
+                // 0-3: hoch (1, 5) -> (1, 2) ? Nein 4 Schritte. 5,4,3,2.
+                // 4: Ecke rein (1, 1)? Nein.
+                
+                // Hardcoded Path für einen Quadranten (0-9)
+                // 0: (1, 5), 1:(1, 4), 2:(1, 3), 3:(1, 2), 4:(1, 1) (Vor Home Eingang)
+                // 5: (2, 1), 6:(3, 1), 7:(4, 1), 8:(5, 1) (Arm raus)
+                // 9: (5, 0) (Spitze)
+                
+                const loc = i%10; const arm = Math.floor(i/10);
+                let x=0, z=0;
+                if(loc < 5) { x=1; z=5-loc; }
+                else if(loc < 9) { x=loc-3; z=1; } // 5->2, 6->3, 7->4, 8->5
+                else { x=5; z=0; } // 9
+                
+                return this.rot(x*this.sc, z*this.sc, arm);
+            }
+            rot(x, z, r) {
+                const a = -r * Math.PI/2;
+                return new THREE.Vector3(x*Math.cos(a)-z*Math.sin(a), 0, x*Math.sin(a)+z*Math.cos(a));
+            }
+            getAbs(i, c) { let o=0; if(c==='blue')o=10; if(c==='green')o=20; if(c==='yellow')o=30; return (i+o)%40; }
+            getPos(p, c, idx) {
+                if(p===-1) {
+                    // Base Position
+                    let dx=1, dz=1; if(c==='blue')dz=-1; if(c==='green'){dx=-1;dz=-1;} if(c==='yellow')dx=-1;
+                    const ox = 12 * dx; const oz = 12 * dz;
+                    const row = Math.floor(idx/2); const col = idx%2;
+                    return new THREE.Vector3((ox + row*3*dx)*this.sc/2.5, 0, (oz + col*3*dz)*this.sc/2.5);
+                }
+                if(p>=40) {
+                    const st = p-40+1; let r=0; if(c==='blue')r=1; if(c==='green')r=2; if(c==='yellow')r=3;
+                    return this.rot(0, (5-st)*this.sc, r);
+                }
+                return this.getVec(this.getAbs(p, c));
+            }
+        }
+
         class Piece {
             constructor(c,i,s,b) {
-                this.col=c; this.idx=i; this.board=b; this.pos=-1;
+                this.c=c; this.idx=i; this.board=b; this.pos=-1;
                 this.mesh=new THREE.Group(); this.mesh.userData={p:this};
-                const mat = new THREE.MeshStandardMaterial({color:COLORS[c]});
-                if(c==='red') {
-                    this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7,1.5,16), mat).translateY(0.75));
-                    this.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color:0xffcccc})).translateY(1.6));
-                } else if(c==='blue') {
-                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.4,2,0.3), mat).translateY(1));
-                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1.4,0.3,0.3), mat).translateY(1.3));
-                } else if(c==='green') {
-                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.4), mat).translateY(0.75));
-                    this.mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.4,16), mat).rotateX(Math.PI/2).translateY(1.5));
-                } else {
-                    const gm = new THREE.MeshStandardMaterial({color:COLORS[c], transparent:true, opacity:0.7});
-                    this.mesh.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5,1,4,8), gm).translateY(1));
-                }
+                const m=new THREE.MeshStandardMaterial({color:C[c]});
+                
+                // Simple shapes for stability
+                if(c==='red') this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7,1.5,16), m).translateY(0.75));
+                else if(c==='blue') this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.5,1.5,0.5), m).translateY(0.75));
+                else if(c==='green') this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.3), m).translateY(0.75));
+                else this.mesh.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5,1,4,8), m).translateY(0.75));
+                
                 s.add(this.mesh); this.move(-1,true);
             }
-            move(p, instant) {
-                this.pos=p; const t = this.board.pos(p, this.col, this.idx);
-                if(instant) this.mesh.position.copy(t);
+            move(p, inst) {
+                this.pos=p; const t=this.board.getPos(p,this.c,this.idx);
+                if(inst) this.mesh.position.copy(t);
                 else {
-                    const s = this.mesh.position.clone(); let a=0;
-                    const l = () => { a+=0.05; if(a>1)a=1; this.mesh.position.lerpVectors(s,t,a); 
-                    this.mesh.position.y=Math.sin(a*Math.PI)*2; if(a<1)requestAnimationFrame(l); else this.mesh.position.y=0; };
+                    const s=this.mesh.position.clone(); let a=0;
+                    const l=()=>{ a+=0.05; if(a>1)a=1; this.mesh.position.lerpVectors(s,t,a); this.mesh.position.y=Math.sin(a*Math.PI)*2; if(a<1)requestAnimationFrame(l); else this.mesh.position.y=0; };
                     l();
                 }
             }
         }
 
-        // --- BOARD ---
-        class Board {
-            constructor(s,t) { this.scene=s; this.traps=t; this.s=2.5; this.mk(); }
-            mk() {
-                const p = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x221111}));
-                p.position.y=-0.6; p.receiveShadow=true; this.scene.add(p);
-                for(let i=0; i<40; i++) {
-                    let col = this.traps.includes(i) ? 0xaa00aa : 0x444444;
-                    if(i===0) col=COLORS.red; if(i===10) col=COLORS.blue; if(i===20) col=COLORS.green; if(i===30) col=COLORS.yellow;
-                    const m = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.2,2.3), new THREE.MeshStandardMaterial({color:col}));
-                    m.position.copy(this.vec(i)); m.position.y=0.1; this.scene.add(m);
-                    if(this.traps.includes(i)) {
-                        const q = new THREE.Mesh(new THREE.BoxGeometry(0.4,1,0.4), new THREE.MeshBasicMaterial({color:0xff00ff}));
-                        q.position.copy(m.position); q.position.y=0.6; this.scene.add(q);
-                    }
-                }
-                ['red','blue','green','yellow'].forEach(c => {
-                    let x=15, z=15; if(c==='blue') z=-15; if(c==='green'){x=-15;z=-15;} if(c==='yellow') x=-15;
-                    const b = new THREE.Mesh(new THREE.CylinderGeometry(5,5,0.2,32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
-                    b.position.set(x,0.1,z); this.scene.add(b);
-                });
-                for(let s=1; s<=4; s++) {
-                    this.safe('red',s,0); this.safe('blue',s,1); this.safe('green',s,2); this.safe('yellow',s,3);
-                }
-            }
-            safe(c, step, rot) {
-                 const v = new THREE.Vector3(0,0,(5-step)*this.s);
-                 const ang = -rot*Math.PI/2;
-                 const rx = v.x*Math.cos(ang)-v.z*Math.sin(ang); const rz = v.x*Math.sin(ang)+v.z*Math.cos(ang);
-                 const m = new THREE.Mesh(new THREE.BoxGeometry(2,0.2,2), new THREE.MeshStandardMaterial({color:COLORS[c]}));
-                 m.position.set(rx, 0.1, rz); this.scene.add(m);
-            }
-            vec(i) {
-                const a=Math.floor(i/10), l=i%10; let x=0,z=0;
-                if(l<5){x=1*this.s; z=(5-l)*this.s;} else {x=(l-3)*this.s; z=1*this.s;}
-                const ang = -a*Math.PI/2;
-                return new THREE.Vector3(x*Math.cos(ang)-z*Math.sin(ang), 0.1, x*Math.sin(ang)+z*Math.cos(ang));
-            }
-            abs(i,c){ let o=0; if(c==='blue')o=10; if(c==='green')o=20; if(c==='yellow')o=30; return (i+o)%40; }
-            pos(i,c,idx) {
-                if(i===-1) {
-                    let x=15, z=15; if(c==='blue') z=-15; if(c==='green') {x=-15; z=-15;} if(c==='yellow') x=-15;
-                    x += (idx%2===0?-1.5:1.5); z += (idx<2?-1.5:1.5);
-                    return new THREE.Vector3(x,0,z);
-                }
-                if(i>=40) {
-                     const st = i-40+1; const v = new THREE.Vector3(0,0,(5-st)*this.s);
-                     let r=0; if(c==='blue')r=1; if(c==='green')r=2; if(c==='yellow')r=3;
-                     const ang = -r*Math.PI/2;
-                     return new THREE.Vector3(v.x*Math.cos(ang)-v.z*Math.sin(ang), 0, v.x*Math.sin(ang)+v.z*Math.cos(ang));
-                }
-                const v = this.vec(this.abs(i,c)); v.y=0; return v;
-            }
-            isTrap(a){return this.traps.includes(a);}
-        }
-
         class Dice {
             constructor(s) {
-                const g = new THREE.BoxGeometry(3,3,3); const m=[];
+                const g=new THREE.BoxGeometry(3,3,3); const m=[];
                 for(let i=1;i<=6;i++){
-                    const c=document.createElement('canvas');c.width=64;c.height=64;
-                    const x=c.getContext('2d');x.fillStyle='#eee';x.fillRect(0,0,64,64);
-                    x.fillStyle='red';x.font='40px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(i,32,32);
-                    x.lineWidth=4;x.strokeRect(0,0,64,64);
+                    const c=document.createElement('canvas');c.width=64;c.height=64;const x=c.getContext('2d');
+                    x.fillStyle='#eee';x.fillRect(0,0,64,64);x.fillStyle='#900';x.font='40px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(i,32,32);x.lineWidth=4;x.strokeRect(0,0,64,64);
                     m.push(new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
                 }
                 this.m=new THREE.Mesh(g,m); this.m.position.set(0,5,0); s.add(this.m);
             }
-            anim(v, cb) {
+            roll(v, cb) {
                 let t=0; const i=setInterval(()=>{
-                    this.m.rotation.x+=0.5; this.m.rotation.y+=0.5; t+=50;
-                    if(t>800){clearInterval(i); this.m.rotation.set(0,0,0);
-                    if(v===1)this.m.rotation.y=Math.PI/2; if(v===2)this.m.rotation.y=-Math.PI/2;
-                    if(v===4)this.m.rotation.x=Math.PI; if(v===5)this.m.rotation.x=-Math.PI/2; if(v===6)this.m.rotation.x=Math.PI/2;
-                    cb();}
+                    this.m.rotation.x+=0.5; this.m.rotation.z+=0.5; t+=50;
+                    if(t>800){ clearInterval(i); this.m.rotation.set(0,0,0);
+                    if(v===1)this.m.rotation.y=1.57; if(v===2)this.m.rotation.y=-1.57; if(v===4)this.m.rotation.x=3.14; if(v===5)this.m.rotation.x=-1.57; if(v===6)this.m.rotation.x=1.57;
+                    if(cb)cb();}
                 },50);
             }
         }
