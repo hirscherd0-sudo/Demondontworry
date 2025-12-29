@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-final-fix",
-  "version": "9.0.0",
-  "description": "Ludo Fixed Libraries",
+  "name": "horror-ludo-repair-final",
+  "version": "10.0.0",
+  "description": "Ludo with Load Fix",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
