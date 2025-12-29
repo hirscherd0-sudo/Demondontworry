@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo Loading</title>
+    <title>Horror Ludo Stable</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
 
@@ -50,7 +50,7 @@
         .quiz-opt { background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; text-align: left; }
         .quiz-opt:hover { border-color: red; background: #440000; }
 
-        /* LOADING SCREEN SPECIFIC */
+        /* LOADING */
         #loading-bar-container {
             width: 80%; max-width: 600px; height: 30px; background: #220000; 
             border: 2px solid #660000; border-radius: 15px; margin-top: 20px; overflow: hidden;
@@ -59,12 +59,9 @@
             width: 0%; height: 100%; background: linear-gradient(90deg, #ff0000, #ff6600);
             transition: width 0.3s ease-out;
         }
-        #loading-log {
-            margin-top: 10px; color: #aaa; font-family: monospace; font-size: 1.2rem;
-        }
-        #loading-percent {
-            font-size: 2rem; color: #ff0000; font-family: 'Creepster', cursive; margin-top: 10px;
-        }
+        #loading-log { margin-top: 10px; color: #aaa; font-family: monospace; font-size: 1rem; height: 20px;}
+        #loading-percent { font-size: 2rem; color: #ff0000; font-family: 'Creepster', cursive; margin-top: 10px; }
+        #force-start-btn { margin-top: 20px; font-size: 1rem; padding: 10px 20px; display: none; }
 
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -100,7 +97,7 @@
     <!-- SCREENS -->
     <div id="login-screen" class="overlay">
         <h1 style="font-family:'Creepster'; font-size:5rem; color:red; margin:0;">HORROR LUDO</h1>
-        <p style="color:#888;">Todeszone Edition</p>
+        <p style="color:#888;">Stable Edition</p>
         <br>
         <input type="text" id="room-input" placeholder="Raum Name">
         <button class="btn-horror" onclick="join()">BEITRETEN</button>
@@ -113,14 +110,14 @@
         <button id="btn-start" class="btn-horror" onclick="start()" disabled>WARTEN AUF HOST...</button>
     </div>
 
-    <!-- LOADING SCREEN -->
     <div id="loading-screen" class="overlay hidden">
-        <h1 style="color:red; font-family:'Creepster'">Beschwöre Spielwelt...</h1>
+        <h1 style="color:red; font-family:'Creepster'">Lade Welt...</h1>
         <div id="loading-percent">0%</div>
         <div id="loading-bar-container">
             <div id="loading-bar-fill"></div>
         </div>
-        <div id="loading-log">Verbinde mit Server...</div>
+        <div id="loading-log">Init...</div>
+        <button id="force-start-btn" class="btn-horror" onclick="forceGameStart()">TROTZDEM STARTEN</button>
     </div>
 
     <div id="quiz-screen" class="overlay hidden">
@@ -138,7 +135,6 @@
         let myData = { color:null, figure:null, isHost:false };
         let game = null;
 
-        // --- NETWORK ---
         function join() {
             const r = document.getElementById('room-input').value;
             if(r) socket.emit('joinGame', r);
@@ -156,65 +152,69 @@
             document.getElementById('lobby-screen').classList.remove('hidden');
         });
 
-        socket.on('youAreHost', () => {
-            myData.isHost = true;
-            updateLobbyButton();
-        });
+        socket.on('youAreHost', () => { myData.isHost=true; updateLobby(); });
 
         socket.on('lobbyUpdate', data => {
             document.getElementById('lobby-list').innerHTML = data.players.map(p => 
                 `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
             ).join('');
-            
-            // Check host again from packet to be safe
             if(data.hostId === socket.id) myData.isHost = true;
-            updateLobbyButton();
+            updateLobby();
         });
 
-        function updateLobbyButton() {
+        function updateLobby() {
             const btn = document.getElementById('btn-start');
-            const txt = document.getElementById('lobby-wait-text');
             if(myData.isHost) {
-                btn.disabled = false; btn.innerText = "SPIEL STARTEN";
-                txt.innerText = "Du bist der Host. Starte, wenn alle bereit sind.";
-            } else {
-                btn.disabled = true; btn.innerText = "WARTEN AUF HOST...";
-                txt.innerText = "Der Host bereitet das Spiel vor...";
+                btn.disabled=false; btn.innerText="SPIEL STARTEN";
+                document.getElementById('lobby-wait-text').innerText = "Du bist Host.";
             }
         }
 
-        // --- LOADING LOGIC ---
+        // --- LOADING ---
         socket.on('prepareGame', data => {
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('loading-screen').classList.remove('hidden');
-            startLoadingSequence(data);
+            runLoader(data);
         });
 
-        async function startLoadingSequence(data) {
-            const log = document.getElementById('loading-log');
-            const bar = document.getElementById('loading-bar-fill');
-            const pct = document.getElementById('loading-percent');
+        // Backup falls Server Event fehlt
+        socket.on('gameLive', () => {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('hud-layer').classList.remove('hidden');
+        });
 
-            const steps = [
-                { msg: "Generiere Spielbrett...", p: 20 },
-                { msg: "Lade Texturen...", p: 40 },
-                { msg: "Baue Figuren zusammen...", p: 60 },
-                { msg: "Berechne Schatten...", p: 80 },
-                { msg: "Starte 3D Engine...", p: 90 },
-                { msg: "FERTIG!", p: 100 }
-            ];
-
-            for (let step of steps) {
-                log.innerText = step.msg;
-                bar.style.width = step.p + "%";
-                pct.innerText = step.p + "%";
-                await new Promise(r => setTimeout(r, 400)); // Künstliche Pause für Effekt
-            }
-
-            // Wenn fertig, Engine starten
-            if(!game) game = new Game3D(data);
+        async function runLoader(data) {
+            const l = document.getElementById('loading-log');
+            const b = document.getElementById('loading-bar-fill');
+            const p = document.getElementById('loading-percent');
             
-            // UI Switch
+            try {
+                const steps = [
+                    {m:"Generiere Board...", v:20}, {m:"Lade Texturen...", v:50},
+                    {m:"Erstelle Figuren...", v:80}, {m:"Starte 3D...", v:100}
+                ];
+                
+                for(let s of steps) {
+                    l.innerText = s.m; b.style.width=s.v+"%"; p.innerText=s.v+"%";
+                    await new Promise(r=>setTimeout(r, 600));
+                }
+
+                if(!game) game = new Game3D(data);
+                l.innerText = "Warte auf Server...";
+                
+                // Safety Timeout Button
+                setTimeout(() => {
+                    document.getElementById('force-start-btn').style.display = 'block';
+                }, 3000);
+
+            } catch(e) {
+                l.innerText = "FEHLER: " + e.message;
+                l.style.color = "red";
+                console.error(e);
+            }
+        }
+
+        function forceGameStart() {
             document.getElementById('loading-screen').classList.add('hidden');
             document.getElementById('hud-layer').classList.remove('hidden');
         }
@@ -225,35 +225,41 @@
         // --- ENGINE ---
         class Game3D {
             constructor(data) {
-                this.players = data.players;
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x050505);
-                
-                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-                this.camera.position.set(0, 55, 45);
-                this.camera.lookAt(0,0,0);
+                try {
+                    this.players = data.players;
+                    this.scene = new THREE.Scene();
+                    this.scene.background = new THREE.Color(0x050505);
+                    
+                    this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+                    this.camera.position.set(0, 55, 45);
+                    this.camera.lookAt(0,0,0);
 
-                const cvs = document.getElementById('game-canvas');
-                this.renderer = new THREE.WebGLRenderer({antialias:true, canvas:cvs});
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                    const cvs = document.getElementById('game-canvas');
+                    this.renderer = new THREE.WebGLRenderer({antialias:true, canvas:cvs});
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
 
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-                const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-                dir.position.set(20,50,20); dir.castShadow=true;
-                this.scene.add(dir);
+                    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+                    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+                    dir.position.set(20,50,20); dir.castShadow=true;
+                    this.scene.add(dir);
 
-                this.board = new Board(this.scene, data.trapFields);
-                this.dice = new Dice(this.scene);
-                this.pieces = [];
-                this.initPieces();
+                    this.board = new Board(this.scene, data.trapFields);
+                    this.dice = new Dice(this.scene);
+                    this.pieces = [];
+                    this.initPieces();
 
-                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-                this.raycaster = new THREE.Raycaster();
-                cvs.addEventListener('click', e => this.click(e));
+                    this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                    this.raycaster = new THREE.Raycaster();
+                    cvs.addEventListener('click', e => this.click(e));
 
-                this.active = {}; this.rolled = null; this.rollCount = 0; this.tmr = null;
-                this.socketListeners();
-                this.loop();
+                    this.active = {}; this.rolled = null; this.rollCount = 0; this.tmr = null;
+                    this.socketListeners();
+                    this.loop();
+                    console.log("Game3D initialized successfully");
+                } catch(e) {
+                    console.error("Game3D Init Failed:", e);
+                    throw e;
+                }
             }
 
             initPieces() {
@@ -268,6 +274,10 @@
                     document.getElementById('turn-name').innerText = d.activeName;
                     document.getElementById('turn-name').style.color = '#'+COLORS[d.activeColor].toString(16);
                     this.timer(d.timeout);
+
+                    // Automatisch Umschalten wenn wir im Ladescreen festhängen
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    document.getElementById('hud-layer').classList.remove('hidden');
 
                     const btn = document.getElementById('btn-action');
                     const msg = document.getElementById('status-msg');
