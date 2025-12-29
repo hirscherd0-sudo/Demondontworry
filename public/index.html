@@ -2,553 +2,478 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Horror Ludo Multiplayer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klassenbuch Pro</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PDF Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
-
-        body { margin: 0; overflow: hidden; background-color: #050505; color: #eee; font-family: 'Roboto', sans-serif; touch-action: none; }
-
-        /* LAYER 0: GAME */
-        #game-canvas { display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
-
-        /* LAYER 1: HUD (FEST VERANKERT) */
-        #hud-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10; pointer-events: none;
-            display: flex; flex-direction: column; justify-content: space-between;
-        }
-
-        .hud-panel {
-            background: rgba(20, 0, 0, 0.95); border: 3px solid #800; padding: 10px 15px; margin: 15px; 
-            border-radius: 10px; pointer-events: auto; box-shadow: 0 0 20px #000; min-width: 150px;
-        }
-
-        .top-row { display: flex; justify-content: space-between; align-items: flex-start; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
         
-        #identity h2, #turn-info h2 { font-family: 'Creepster', cursive; margin: 0; font-size: 1.4rem; letter-spacing: 1px; }
-        #timer-box { font-size: 3.5rem; color: #f00; font-weight: bold; text-align: center; text-shadow: 0 0 15px #f00; line-height: 1; margin-top: 5px;}
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         
-        .bottom-row { display: flex; justify-content: center; padding-bottom: 30px; pointer-events: auto; }
-        
-        #status-bar {
-            background: rgba(0,0,0,0.9); padding: 15px 40px; border-radius: 50px;
-            font-size: 1.5rem; border: 2px solid #444; margin-bottom: 20px; text-align: center;
-            color: #fff; font-weight: bold; box-shadow: 0 0 30px #000;
+        /* Glassmorphism Card */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         }
 
-        .btn-horror {
-            background: linear-gradient(to bottom, #a00, #600); color: white; border: 3px solid #f00;
-            padding: 20px 60px; font-size: 2rem; font-family: 'Creepster', cursive; cursor: pointer; 
-            pointer-events: auto; box-shadow: 0 0 20px red; border-radius: 12px; transition: 0.1s;
-        }
-        .btn-horror:active { transform: scale(0.95); }
-        .btn-horror:hover { filter: brightness(1.2); }
+        /* Toggle Switch */
+        .toggle-checkbox:checked { right: 0; border-color: #10b981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
 
-        /* LAYER 2: OVERLAYS */
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(10, 5, 5, 0.98); z-index: 50;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            pointer-events: auto;
-        }
-        .hidden { display: none !important; }
+        /* Animationen */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-        input { padding: 15px; font-size: 1.5rem; background: #222; color: white; border: 2px solid #555; margin-bottom: 25px; text-align: center; border-radius: 5px; width: 300px;}
-        
-        /* LOADING */
-        #load-cont { width: 300px; height: 30px; background: #200; border: 2px solid #500; margin-top: 20px; border-radius: 15px; overflow: hidden; }
-        #load-bar { width: 0%; height: 100%; background: #f00; transition: width 0.3s; }
-        #load-txt { margin-top: 10px; color: #888; font-family: monospace; }
-
-        /* QUIZ */
-        .quiz-opt { background: #222; padding: 15px; margin: 10px; width: 90%; max-width: 400px; border: 1px solid #555; cursor: pointer; text-align: left; font-size: 1.2rem; }
-        .quiz-opt:hover { border-color: red; background: #400; }
-
+        [v-cloak] { display: none; }
     </style>
-    <!-- LIBRARIES -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
 </head>
-<body>
+<body class="text-slate-800 antialiased min-h-screen bg-gradient-to-br from-slate-100 to-blue-50">
 
-    <canvas id="game-canvas"></canvas>
+<div id="app" v-cloak class="min-h-screen flex flex-col">
 
-    <!-- HUD -->
-    <div id="hud-layer" class="hidden">
-        <div class="top-row">
-            <div class="hud-panel" id="identity">
-                <small style="color:#aaa">Du spielst:</small>
-                <h2 id="my-name">---</h2>
-                <div id="my-dot" style="width:100%; height:5px; background:gray; margin-top:5px;"></div>
+    <!-- Navbar (nur sichtbar wenn eingeloggt) -->
+    <header v-if="view !== 'login'" class="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center gap-4">
+                <button v-if="view !== 'calendar'" @click="goBack" class="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
+                    <i data-lucide="arrow-left"></i>
+                </button>
+                <div class="flex flex-col">
+                    <h1 class="font-bold text-slate-800 tracking-tight">Klassenbuch Digital</h1>
+                    <span class="text-xs text-slate-500 font-mono">{{ getBreadcrumb() }}</span>
+                </div>
             </div>
             
-            <div class="hud-panel" style="text-align:center; min-width:100px;">
-                <small style="color:#aaa">Zeit</small>
-                <div id="timer-box">30</div>
-            </div>
-
-            <div class="hud-panel" id="turn-info" style="text-align:right;">
-                <small style="color:#aaa">Am Zug:</small>
-                <h2 id="turn-name" style="color:gold">---</h2>
-            </div>
-        </div>
-
-        <div class="bottom-row">
-            <div style="display:flex; flex-direction:column; align-items:center;">
-                <div id="status-bar">Warte auf Spielstart...</div>
-                <button id="btn-action" class="btn-horror" style="display:none;" onclick="game.roll()">WÜRFELN</button>
+            <div class="flex items-center gap-4">
+                <div class="px-3 py-1 rounded-full text-xs font-bold border"
+                     :class="role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'">
+                    {{ role === 'admin' ? 'ADMINISTRATOR' : 'GAST' }}
+                </div>
+                <button @click="logout" class="text-slate-400 hover:text-red-600 transition">
+                    <i data-lucide="log-out" width="20"></i>
+                </button>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- LOGIN -->
-    <div id="login-screen" class="overlay">
-        <h1 style="font-family:'Creepster'; font-size:5rem; color:red; margin:0; text-shadow:0 0 20px #000">HORROR LUDO</h1>
-        <p style="color:#aaa; font-size:1.2rem;">Multiplayer Edition</p>
-        <br>
-        <input type="text" id="room-input" placeholder="Raum Name">
-        <button class="btn-horror" onclick="join()">BEITRETEN</button>
-    </div>
+    <!-- Content Area -->
+    <main class="flex-grow flex flex-col items-center justify-start p-6 w-full max-w-7xl mx-auto">
 
-    <!-- LOBBY -->
-    <div id="lobby-screen" class="overlay hidden">
-        <h1 style="color:red; font-family:'Creepster'">Krypta Lobby</h1>
-        <div id="lobby-list" style="font-size:1.5rem; margin-bottom:30px; text-align:center;"></div>
-        <p style="color:#666" id="lobby-msg">Warte auf Spieler...</p>
-        <button id="btn-start" class="btn-horror" onclick="start()" disabled>WARTEN...</button>
-    </div>
-
-    <!-- LOADING -->
-    <div id="load-screen" class="overlay hidden">
-        <h1 style="color:red; font-family:'Creepster'">Lade Welt...</h1>
-        <div id="load-cont"><div id="load-bar"></div></div>
-        <div id="load-txt">Init...</div>
-        <button id="force-btn" style="display:none; margin-top:20px;" class="btn-horror" onclick="forceStart()">START ERZWINGEN</button>
-    </div>
-
-    <!-- QUIZ -->
-    <div id="quiz-screen" class="overlay hidden">
-        <h2 style="color:red; font-family:'Creepster'; font-size:3rem;">Todesfrage</h2>
-        <p id="q-text" style="font-size:1.5rem;">?</p>
-        <div id="q-opts"></div>
-    </div>
-
-    <script>
-        document.getElementById('room-input').value = "Friedhof_" + Math.floor(Math.random()*1000);
-        
-        const socket = io();
-        // Farben und Materialien
-        const COLORS = { red: 0xaa0000, blue: 0x0000aa, green: 0x005500, yellow: 0xdddd00 };
-        const QUESTIONS = [{q:"Killer in Halloween?", a:["Michael","Jason","Freddy"], c:0}, {q:"Regisseur Psycho?", a:["Hitchcock","Spielberg"], c:0}];
-
-        let myData = { color:null, figure:null, isHost:false };
-        let game = null;
-
-        function join() {
-            const r = document.getElementById('room-input').value;
-            if(r) socket.emit('joinGame', r);
-        }
-        function start() {
-            socket.emit('requestStartGame', document.getElementById('room-input').value);
-        }
-        function forceStart() {
-            document.getElementById('load-screen').classList.add('hidden');
-            document.getElementById('hud-layer').classList.remove('hidden');
-        }
-
-        socket.on('setIdentity', data => {
-            myData = data;
-            document.getElementById('my-name').innerText = data.figure;
-            document.getElementById('my-name').style.color = '#'+COLORS[data.color].toString(16);
-            document.getElementById('my-dot').style.background = '#'+COLORS[data.color].toString(16);
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
-        });
-
-        socket.on('youAreHost', () => { myData.isHost=true; updateLobby(); });
-
-        socket.on('lobbyUpdate', data => {
-            document.getElementById('lobby-list').innerHTML = data.players.map(p => 
-                `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
-            ).join('');
-            if(data.hostId === socket.id) myData.isHost = true;
-            updateLobby();
-        });
-
-        function updateLobby() {
-            const btn = document.getElementById('btn-start');
-            const msg = document.getElementById('lobby-msg');
-            if(myData.isHost) {
-                btn.disabled=false; btn.innerText="SPIEL STARTEN";
-                msg.innerText = "Du bist Host. Starte, wenn bereit.";
-            } else {
-                btn.disabled=true; btn.innerText="WARTEN AUF HOST";
-                msg.innerText = "Der Host bereitet das Spiel vor...";
-            }
-        }
-
-        socket.on('prepareGame', data => {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('load-screen').classList.remove('hidden');
-            runLoader(data);
-        });
-
-        socket.on('gameLive', () => {
-            document.getElementById('load-screen').classList.add('hidden');
-            document.getElementById('hud-layer').classList.remove('hidden');
-        });
-
-        async function runLoader(data) {
-            const l = document.getElementById('load-txt');
-            const b = document.getElementById('load-bar');
-            const steps = ["Generiere Board...", "Lade Texturen...", "Baue Figuren...", "Fertig!"];
-            
-            try {
-                for(let i=0; i<steps.length; i++) {
-                    l.innerText = steps[i]; b.style.width=((i+1)*25)+"%";
-                    await new Promise(r=>setTimeout(r, 600));
-                }
-                if(!game) game = new Game3D(data);
-                l.innerText = "Warte auf Server Sync...";
-                setTimeout(()=>document.getElementById('force-btn').style.display='block', 4000);
-            } catch(e) {
-                l.innerText = "FEHLER: " + e.message; l.style.color="red";
-            }
-        }
-
-        socket.on('errorMsg', msg => alert(msg));
-
-
-        // --- ENGINE ---
-        class Game3D {
-            constructor(data) {
-                this.players = data.players;
-                this.scene = new THREE.Scene();
-                this.scene.background = new THREE.Color(0x050505);
-                this.scene.fog = new THREE.FogExp2(0x050505, 0.012);
-
-                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-                this.setCameraByColor(myData.color); // PERSÖNLICHE KAMERA
-
-                const cvs = document.getElementById('game-canvas');
-                this.renderer = new THREE.WebGLRenderer({antialias:true, canvas:cvs});
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.shadowMap.enabled = true;
-
-                // Licht
-                this.scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-                const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-                dir.position.set(20,60,20); dir.castShadow=true;
-                dir.shadow.mapSize.width=2048; dir.shadow.mapSize.height=2048;
-                this.scene.add(dir);
-
-                this.board = new Board(this.scene, data.trapFields);
-                this.dice = new Dice(this.scene);
-                this.pieces = [];
-                this.initPieces();
-
-                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
-                this.controls.enablePan = false; 
-                this.controls.maxPolarAngle = Math.PI / 2.2; // Nicht unter Boden gucken
-
-                this.raycaster = new THREE.Raycaster();
-                cvs.addEventListener('click', e => this.click(e));
-
-                this.active = {}; this.rolled = null; this.rollCount = 0; this.tmr = null;
-                this.socketListeners();
-                this.loop();
-            }
-
-            // KAMERA LOGIK
-            setCameraByColor(c) {
-                // Setzt die Kamera so, dass das eigene Haus "unten" ist
-                if(c === 'red') this.camera.position.set(0, 60, 50);      // Standard (Süden)
-                else if(c === 'blue') this.camera.position.set(50, 60, 0); // Osten
-                else if(c === 'green') this.camera.position.set(0, 60, -50); // Norden
-                else if(c === 'yellow') this.camera.position.set(-50, 60, 0); // Westen
-                else this.camera.position.set(0, 60, 50); // Fallback
-                
-                this.camera.lookAt(0,0,0);
-            }
-
-            initPieces() {
-                ['red','blue','green','yellow'].forEach(c => {
-                    for(let i=0;i<4;i++) this.pieces.push(new Piece(c,i,this.scene,this.board));
-                });
-            }
-
-            socketListeners() {
-                socket.on('turnChanged', d => {
-                    this.active = d; this.rolled = null; this.rollCount = 0;
-                    document.getElementById('turn-name').innerText = d.activeName;
-                    document.getElementById('turn-name').style.color = '#'+COLORS[d.activeColor].toString(16);
-                    this.timer(d.timeout);
-
-                    // Automatisch Screens umschalten falls noch im Laden
-                    document.getElementById('load-screen').classList.add('hidden');
-                    document.getElementById('hud-layer').classList.remove('hidden');
-
-                    const btn = document.getElementById('btn-action');
-                    const msg = document.getElementById('status-bar');
+        <!-- VIEW 1: Login -->
+        <transition name="fade" mode="out-in">
+            <div v-if="view === 'login'" class="flex flex-col items-center justify-center h-[80vh] w-full">
+                <div class="glass-card p-10 rounded-3xl w-full max-w-md text-center">
+                    <div class="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200 text-white transform rotate-3">
+                        <i data-lucide="shield-check" width="40" height="40"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold mb-2 text-slate-800">Willkommen</h2>
+                    <p class="text-slate-400 mb-8">Bitte authentifizieren Sie sich</p>
                     
-                    if(d.activeColor === myData.color) {
-                        msg.innerText = "DU BIST DRAN!";
-                        msg.style.color = "#0f0";
-                        btn.style.display = 'inline-block'; btn.innerText = "WÜRFELN";
-                    } else {
-                        msg.innerText = d.activeName + " ist dran...";
-                        msg.style.color = "#fff";
-                        btn.style.display = 'none';
-                    }
-                    // Bot macht nur Server requests, client wartet
+                    <form @submit.prevent="handleLogin" class="relative">
+                        <div class="relative">
+                            <i data-lucide="key" class="absolute left-4 top-3.5 text-slate-400" width="18"></i>
+                            <input type="password" v-model="password" placeholder="Zugangscode eingeben" 
+                                   class="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-700 font-medium placeholder:text-slate-400">
+                        </div>
+                        <button type="submit" class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+                            Anmelden
+                        </button>
+                    </form>
+                    <p v-if="error" class="text-red-500 text-sm mt-4 font-medium bg-red-50 py-2 rounded-lg">{{ error }}</p>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Calendar / Week Overview -->
+            <div v-else-if="view === 'calendar'" class="w-full max-w-4xl mt-8">
+                <div class="flex justify-between items-end mb-8">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Wochenübersicht</h2>
+                        <p class="text-slate-500">Wählen Sie einen Tag zur Bearbeitung</p>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                         <button @click="changeWeek(-1)" class="p-2 bg-white border rounded-lg hover:bg-slate-50"><i data-lucide="chevron-left"></i></button>
+                         <button @click="changeWeek(0)" class="px-4 py-2 bg-white border rounded-lg text-sm font-bold hover:bg-slate-50">Heute</button>
+                         <button @click="changeWeek(1)" class="p-2 bg-white border rounded-lg hover:bg-slate-50"><i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <button v-for="(date, index) in currentWeek" :key="date" @click="selectDay(date)"
+                            class="glass-card p-6 rounded-2xl text-left transition-all hover:border-blue-400 hover:shadow-lg group relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition">
+                            <i data-lucide="calendar" width="60" height="60"></i>
+                        </div>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                            {{ ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'][index] }}
+                        </span>
+                        <span class="text-2xl font-bold text-slate-800 group-hover:text-blue-600 block">
+                            {{ formatDateShort(date) }}
+                        </span>
+                        <span class="text-xs text-blue-500 font-medium mt-4 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
+                            Öffnen &rarr;
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Admin Only: PDF Export -->
+                <div v-if="role === 'admin'" class="mt-12 text-center border-t border-slate-200 pt-8">
+                    <button @click="generateMatrixPDF" class="inline-flex items-center gap-2 bg-slate-800 text-white px-6 py-3 rounded-xl hover:bg-slate-700 transition shadow-lg">
+                        <i data-lucide="file-spreadsheet"></i>
+                        Wochenbericht exportieren (PDF A4 Quer)
+                    </button>
+                    <p class="text-xs text-slate-400 mt-2">Exportiert alle Stunden (Mo-Fr) in einer Matrix.</p>
+                </div>
+            </div>
+
+            <!-- VIEW 3: Period Selection -->
+            <div v-else-if="view === 'periods'" class="w-full max-w-3xl mt-8">
+                <div class="text-center mb-10">
+                    <h2 class="text-3xl font-bold text-slate-800">{{ getDayName(selectedDate) }}</h2>
+                    <p class="text-slate-500 font-medium">{{ formatDateLong(selectedDate) }}</p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <button v-for="i in 8" :key="i" @click="selectPeriod(i)"
+                            class="aspect-square glass-card rounded-2xl flex flex-col items-center justify-center hover:scale-105 hover:border-blue-500 transition-all cursor-pointer group">
+                        <span class="text-5xl font-black text-slate-200 group-hover:text-blue-600 transition-colors">{{ i }}</span>
+                        <span class="text-xs font-bold uppercase text-slate-400 mt-2 tracking-widest group-hover:text-slate-600">Stunde</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Attendance List -->
+            <div v-else-if="view === 'list'" class="w-full max-w-4xl mt-4">
+                <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+                    <!-- List Header -->
+                    <div class="bg-slate-50 px-8 py-5 border-b border-slate-200 flex justify-between items-center">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">{{ selectedPeriod }}. Std</span>
+                                <span class="font-bold text-slate-700">{{ getDayName(selectedDate) }}</span>
+                            </div>
+                            <h2 class="text-xl font-bold text-slate-900 mt-1">Anwesenheitsliste</h2>
+                        </div>
+                        
+                        <div class="text-right">
+                             <div class="text-3xl font-bold text-slate-800">
+                                 {{ students.filter(s => s.present).length }}<span class="text-slate-300 text-lg">/{{ students.length }}</span>
+                             </div>
+                             <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Anwesend</div>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-white border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider">
+                                    <th class="px-8 py-4 font-bold">Name des Schülers</th>
+                                    <th class="px-6 py-4 font-bold text-center w-32">Status</th>
+                                    <th class="px-8 py-4 font-bold">Anmerkung</th>
+                                    <th v-if="role === 'admin'" class="px-4 py-4 w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                <tr v-for="(student, index) in students" :key="student.id" class="group hover:bg-slate-50 transition-colors">
+                                    
+                                    <!-- Name Column -->
+                                    <td class="px-8 py-4">
+                                        <input v-if="role === 'admin'" type="text" v-model="student.name" @change="saveData"
+                                               class="w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none font-semibold text-slate-700">
+                                        <span v-else class="font-semibold text-slate-700">{{ student.name }}</span>
+                                    </td>
+
+                                    <!-- Toggle Column -->
+                                    <td class="px-6 py-4 flex justify-center">
+                                        <div class="relative inline-block w-12 mr-2 align-middle select-none">
+                                            <input type="checkbox" :id="'toggle-'+index" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                                                   style="top:0; left:0; transition: all 0.3s;"
+                                                   v-model="student.present" @change="saveData">
+                                            <label :for="'toggle-'+index" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-200 cursor-pointer border border-slate-200 transition-colors"
+                                                   :class="{'bg-green-500 border-green-500': student.present, 'bg-red-400 border-red-400': !student.present}"></label>
+                                        </div>
+                                    </td>
+
+                                    <!-- Notes Column with "Ungeklärt" Logic -->
+                                    <td class="px-8 py-4">
+                                        <div class="relative">
+                                            <input type="text" v-model="student.note" @change="saveData" :readonly="role === 'guest'"
+                                                   :class="{
+                                                       'bg-red-100 text-red-700 border-red-200 placeholder-red-400': !student.present && !student.note,
+                                                       'bg-slate-50 border-slate-200': student.present || student.note
+                                                   }"
+                                                   class="w-full text-sm rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                                   :placeholder="!student.present && !student.note ? 'UNGEKLÄRT' : 'Anmerkung eingeben...'">
+                                        </div>
+                                    </td>
+
+                                    <!-- Delete Action -->
+                                    <td v-if="role === 'admin'" class="px-4 py-4 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button @click="removeStudent(index)" class="text-slate-300 hover:text-red-500 transition">
+                                            <i data-lucide="trash-2" width="18"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr v-if="students.length === 0">
+                                    <td colspan="4" class="px-8 py-10 text-center text-slate-400 italic">Die Liste ist noch leer.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Admin Add Row -->
+                    <div v-if="role === 'admin'" class="bg-slate-50 px-8 py-4 border-t border-slate-200 flex gap-4">
+                        <input type="text" v-model="newStudentName" placeholder="Neuer Schüler..." 
+                               class="flex-1 bg-white border border-slate-300 rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500">
+                        <button @click="addStudent" class="bg-slate-800 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 transition">
+                            Hinzufügen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+    </main>
+
+    <!-- HIDDEN TABLE FOR PDF EXPORT -->
+    <div id="pdf-export-container" class="hidden">
+        <div class="p-4" style="font-family: sans-serif;">
+            <h1 style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">Anwesenheitsmatrix</h1>
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Woche: {{ currentWeek[0] }} bis {{ currentWeek[4] }}</p>
+            
+            <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #333; padding: 4px; background: #eee; width: 150px; text-align: left;">Name</th>
+                        <!-- 5 Days * 8 Periods Header -->
+                        <template v-for="(day, dIndex) in ['Mo', 'Di', 'Mi', 'Do', 'Fr']">
+                            <th v-for="p in 8" style="border: 1px solid #333; width: 20px; text-align: center; background: #eee;">
+                                {{ day }}{{ p }}
+                            </th>
+                        </template>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="student in matrixData" :key="student.name">
+                        <td style="border: 1px solid #333; padding: 4px; font-weight: bold;">{{ student.name }}</td>
+                        <!-- 5 Days * 8 Periods Cells -->
+                        <template v-for="dIndex in 5"> <!-- 0 to 4 -->
+                            <td v-for="p in 8" 
+                                :style="{
+                                    border: '1px solid #ccc',
+                                    backgroundColor: getMatrixColor(student, dIndex-1, p)
+                                }"
+                            >
+                            <!-- Empty cell, just color -->
+                            </td>
+                        </template>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 10px; font-size: 10px;">
+                <span style="display:inline-block; width: 10px; height: 10px; background: #86efac; border: 1px solid #333; margin-right: 5px;"></span> Anwesend
+                <span style="display:inline-block; width: 10px; height: 10px; background: #fca5a5; border: 1px solid #333; margin-left: 10px; margin-right: 5px;"></span> Abwesend
+                <span style="display:inline-block; width: 10px; height: 10px; background: white; border: 1px solid #333; margin-left: 10px; margin-right: 5px;"></span> Keine Daten
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                view: 'login',
+                role: null,
+                password: '',
+                error: '',
+                
+                // Calendar Logic
+                weekOffset: 0,
+                currentWeek: [], // Array of YYYY-MM-DD
+                selectedDate: null,
+                selectedPeriod: null,
+
+                // Data
+                students: [],
+                newStudentName: '',
+                
+                // PDF Matrix Data
+                matrixData: []
+            }
+        },
+        created() {
+            this.updateWeek();
+        },
+        updated() {
+            lucide.createIcons();
+        },
+        methods: {
+            // --- Navigation & Auth ---
+            handleLogin() {
+                if(this.password === 'Admin') { this.role = 'admin'; this.view = 'calendar'; }
+                else if(this.password === 'Gast') { this.role = 'guest'; this.view = 'calendar'; }
+                else { this.error = 'Ungültiges Passwort'; return; }
+                this.password = '';
+                this.error = '';
+            },
+            logout() {
+                this.role = null;
+                this.view = 'login';
+                this.students = [];
+            },
+            goBack() {
+                if(this.view === 'list') this.view = 'periods';
+                else if(this.view === 'periods') this.view = 'calendar';
+            },
+            getBreadcrumb() {
+                if(this.view === 'login') return '';
+                if(this.view === 'calendar') return 'Wochenübersicht';
+                if(this.view === 'periods') return `Stundenplan > ${this.formatDateShort(this.selectedDate)}`;
+                if(this.view === 'list') return `${this.formatDateShort(this.selectedDate)} > ${this.selectedPeriod}. Stunde`;
+            },
+
+            // --- Calendar Logic ---
+            updateWeek() {
+                const curr = new Date();
+                // Move to Monday of current week + offset
+                const day = curr.getDay();
+                const diff = curr.getDate() - day + (day === 0 ? -6 : 1) + (this.weekOffset * 7);
+                const monday = new Date(curr.setDate(diff));
+                
+                this.currentWeek = [];
+                for(let i=0; i<5; i++) {
+                    const d = new Date(monday);
+                    d.setDate(monday.getDate() + i);
+                    this.currentWeek.push(d.toISOString().split('T')[0]);
+                }
+            },
+            changeWeek(delta) {
+                if (delta === 0) this.weekOffset = 0;
+                else this.weekOffset += delta;
+                this.updateWeek();
+            },
+            selectDay(date) {
+                this.selectedDate = date;
+                this.view = 'periods';
+            },
+            selectPeriod(p) {
+                this.selectedPeriod = p;
+                this.fetchList();
+                this.view = 'list';
+            },
+
+            // --- API Operations ---
+            async fetchList() {
+                try {
+                    const res = await fetch(`/api/attendance/${this.selectedDate}/${this.selectedPeriod}`);
+                    this.students = await res.json();
+                } catch(e) { console.error(e); }
+            },
+            async saveData() {
+                try {
+                    await fetch('/api/attendance', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            date: this.selectedDate,
+                            period: this.selectedPeriod,
+                            list: this.students
+                        })
+                    });
+                } catch(e) { console.error(e); }
+            },
+            addStudent() {
+                if(!this.newStudentName.trim()) return;
+                this.students.push({
+                    id: Date.now(),
+                    name: this.newStudentName,
+                    present: true,
+                    note: ''
                 });
+                this.newStudentName = '';
+                this.students.sort((a,b) => a.name.localeCompare(b.name));
+                this.saveData();
+            },
+            removeStudent(index) {
+                if(confirm('Schüler entfernen?')) {
+                    this.students.splice(index, 1);
+                    this.saveData();
+                }
+            },
 
-                socket.on('statusMessage', d => document.getElementById('status-bar').innerText = d.msg);
+            // --- PDF Matrix Export ---
+            async generateMatrixPDF() {
+                // 1. Fetch aggregated data
+                const res = await fetch('/api/matrix', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ weekDates: this.currentWeek })
+                });
+                this.matrixData = await res.json();
 
-                socket.on('diceRolled', d => {
-                    clearInterval(this.tmr); document.getElementById('timer-box').innerText="-";
-                    this.dice.anim(d.value, () => {
-                        if(d.playerId === socket.id) this.handleRoll(d.value);
-                        else document.getElementById('status-bar').innerText = this.active.activeName + " würfelt " + d.value;
+                // 2. Wait for DOM to update hidden table
+                this.$nextTick(() => {
+                    const element = document.getElementById('pdf-export-container');
+                    element.classList.remove('hidden'); // Show briefly for render
+                    
+                    const opt = {
+                        margin: 5,
+                        filename: `Wochenmatrix_KW.pdf`,
+                        image: { type: 'jpeg', quality: 0.98 },
+                        html2canvas: { scale: 2 },
+                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                    };
+
+                    html2pdf().set(opt).from(element).save().then(() => {
+                        element.classList.add('hidden'); // Hide again
                     });
                 });
-
-                socket.on('pieceMoved', d => {
-                    const p = this.pieces.find(pc => pc.col===d.color && pc.idx===d.pieceId); // use d.color from server
-                    if(!p) {
-                        // Fallback: Nutze Active Color wenn Server keine Color sendet (bei Menschen)
-                        const p2 = this.pieces.find(pc => pc.col===this.active.activeColor && pc.idx===d.pieceId);
-                        if(p2) { p2.move(d.newPosition); this.checkKill(p2); }
-                    } else {
-                        p.move(d.newPosition); this.checkKill(p);
-                    }
-                });
-            }
-
-            handleRoll(val) {
-                this.rolled = val; this.rollCount++;
-                const btn = document.getElementById('btn-action');
-                const msg = document.getElementById('status-bar');
-                btn.style.display = 'none';
-                msg.innerText = "Gewürfelt: " + val;
-
-                const myPs = this.pieces.filter(p => p.col === myData.color);
-                const allHome = myPs.every(p => p.pos === -1);
-
-                if(allHome) {
-                    if(val === 6) {
-                        msg.innerText = "Eine 6! Ziehe raus!";
-                    } else {
-                        if(this.rollCount < 3) {
-                            msg.innerText = `Versuch ${this.rollCount}/3.`;
-                            btn.style.display = 'inline-block'; btn.innerText = "NOCHMAL";
-                            this.rolled = null; return;
-                        } else {
-                            setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
-                        }
-                    }
-                }
+            },
+            getMatrixColor(student, dayIndex, period) {
+                // Key format matches server generation: "dayIndex_period" (e.g. "0_1")
+                const key = `${dayIndex}_${period}`;
+                const status = student.slots[key];
                 
-                if(!this.canMove()) {
-                    setTimeout(() => {
-                        msg.innerText = "Kein Zug möglich.";
-                        setTimeout(() => socket.emit('endTurn', {roomId:document.getElementById('room-input').value}), 1500);
-                    }, 1000);
-                }
-            }
+                if (status === true) return '#86efac'; // Green (Tailwind green-300)
+                if (status === false) return '#fca5a5'; // Red (Tailwind red-300)
+                return 'white'; // No record
+            },
 
-            canMove() {
-                return this.pieces.filter(p=>p.col===myData.color).some(p => {
-                    if(p.pos===-1) return this.rolled===6;
-                    return p.pos+this.rolled<=43;
-                });
-            }
-
-            roll() { socket.emit('rollDice', {roomId:document.getElementById('room-input').value}); }
-
-            click(e) {
-                if(!this.rolled || this.active.activeColor!==myData.color) return;
-                const m = new THREE.Vector2((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
-                this.raycaster.setFromCamera(m, this.camera);
-                const hits = this.raycaster.intersectObjects(this.scene.children, true);
-                for(let h of hits) {
-                    let o = h.object; while(o.parent && !o.userData.p) o=o.parent;
-                    if(o.userData.p && o.userData.p.col===myData.color) {
-                        this.tryMove(o.userData.p); return;
-                    }
-                }
-            }
-
-            tryMove(p) {
-                let n = -1;
-                if(p.pos===-1) { if(this.rolled===6) n=0; else return; }
-                else { n=p.pos+this.rolled; if(n>43) return; }
-
-                const abs = this.board.abs(n, myData.color);
-                socket.emit('movePiece', {roomId:document.getElementById('room-input').value, pieceId:p.idx, newPosition:n});
-                
-                if(this.board.isTrap(abs) && n<40) this.quiz(p);
-                else this.finish();
-            }
-
-            finish() {
-                if(this.rolled===6) {
-                    this.rolled=null; this.rollCount=0;
-                    document.getElementById('status-bar').innerText="6! Nochmal!";
-                    const btn = document.getElementById('btn-action');
-                    btn.style.display='inline-block'; btn.innerText="WÜRFELN";
-                } else socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
-            }
-
-            quiz(p) {
-                const scr = document.getElementById('quiz-screen'); scr.classList.remove('hidden');
-                const q = QUESTIONS[Math.floor(Math.random()*QUESTIONS.length)];
-                document.getElementById('q-text').innerText=q.q;
-                const div = document.getElementById('q-opts'); div.innerHTML='';
-                q.a.forEach((a,i) => {
-                    const b = document.createElement('div'); b.className='quiz-opt'; b.innerText=a;
-                    b.onclick = () => {
-                        scr.classList.add('hidden');
-                        if(i===q.c) { alert("Richtig!"); this.finish(); }
-                        else { 
-                            alert("Falsch!"); 
-                            socket.emit('movePiece', {roomId:document.getElementById('room-input').value, pieceId:p.idx, newPosition:-1});
-                            socket.emit('endTurn', {roomId:document.getElementById('room-input').value});
-                        }
-                    };
-                    div.appendChild(b);
-                });
-            }
-
-            checkKill(atk) {
-                if(atk.pos<0 || atk.pos>=40) return;
-                const aPos = this.board.abs(atk.pos, atk.col);
-                this.pieces.forEach(v => {
-                    if(v!==atk && v.pos>=0 && v.pos<40 && this.board.abs(v.pos, v.col)===aPos) v.move(-1);
-                });
-            }
-
-            timer(s) {
-                if(this.tmr) clearInterval(this.tmr);
-                let t=Math.floor(s); document.getElementById('timer-box').innerText=t;
-                this.tmr=setInterval(()=>{ t--; document.getElementById('timer-box').innerText=t; if(t<=0) clearInterval(this.tmr);}, 1000);
-            }
-            loop() { requestAnimationFrame(()=>this.loop()); this.controls.update(); this.renderer.render(this.scene,this.camera); }
-        }
-
-        // --- PIECES ---
-        class Piece {
-            constructor(c,i,s,b) {
-                this.col=c; this.idx=i; this.board=b; this.pos=-1;
-                this.mesh=new THREE.Group(); this.mesh.userData={p:this};
-                const mat = new THREE.MeshStandardMaterial({color:COLORS[c]});
-                if(c==='red') { // Puppe
-                    this.mesh.add(new THREE.Mesh(new THREE.ConeGeometry(0.7,1.5,16), mat).translateY(0.75));
-                    this.mesh.add(new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({color:0xffcccc})).translateY(1.6));
-                } else if(c==='blue') { // Kreuz
-                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(0.4,2,0.3), mat).translateY(1));
-                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1.4,0.3,0.3), mat).translateY(1.3));
-                } else if(c==='green') { // Stein
-                    this.mesh.add(new THREE.Mesh(new THREE.BoxGeometry(1,1.5,0.4), mat).translateY(0.75));
-                    this.mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,0.4,16), mat).rotateX(Math.PI/2).translateY(1.5));
-                } else { // Geist
-                    const gm = new THREE.MeshStandardMaterial({color:COLORS[c], transparent:true, opacity:0.7});
-                    this.mesh.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.5,1,4,8), gm).translateY(1));
-                }
-                s.add(this.mesh); this.move(-1,true);
-            }
-            move(p, instant) {
-                this.pos=p; const t=this.board.pos(p,this.col,this.idx);
-                if(instant) this.mesh.position.copy(t);
-                else {
-                    const s=this.mesh.position.clone(); let a=0;
-                    const l=()=>{ a+=0.05; if(a>1)a=1; this.mesh.position.lerpVectors(s,t,a); this.mesh.position.y=Math.sin(a*Math.PI)*2; if(a<1)requestAnimationFrame(l); else this.mesh.position.y=0; };
-                    l();
-                }
+            // --- Helpers ---
+            formatDateShort(d) {
+                if(!d) return '';
+                const parts = d.split('-');
+                return `${parts[2]}.${parts[1]}.`;
+            },
+            formatDateLong(d) {
+                 if(!d) return '';
+                 return new Date(d).toLocaleDateString('de-DE', { dateStyle: 'full' });
+            },
+            getDayName(d) {
+                if(!d) return '';
+                return new Date(d).toLocaleDateString('de-DE', { weekday: 'long' });
             }
         }
-
-        // --- BOARD ---
-        class Board {
-            constructor(s,t) { this.s=2.5; this.traps=t; this.scene=s; this.mk(); }
-            mk() {
-                const p = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x221111}));
-                p.position.y=-0.6; p.receiveShadow=true; this.scene.add(p);
-                for(let i=0; i<40; i++) {
-                    let col = this.traps.includes(i) ? 0xaa00aa : 0x444444;
-                    if(i===0) col=COLORS.red; if(i===10) col=COLORS.blue; if(i===20) col=COLORS.green; if(i===30) col=COLORS.yellow;
-                    const m = new THREE.Mesh(new THREE.BoxGeometry(2.3,0.2,2.3), new THREE.MeshStandardMaterial({color:col}));
-                    m.position.copy(this.vec(i)); m.position.y=0.1; this.scene.add(m);
-                    if(this.traps.includes(i)) {
-                        const q = new THREE.Mesh(new THREE.BoxGeometry(0.4,1,0.4), new THREE.MeshBasicMaterial({color:0xff00ff}));
-                        q.position.copy(m.position); q.position.y=0.6; this.scene.add(q);
-                    }
-                }
-                ['red','blue','green','yellow'].forEach(c => {
-                    let x=15, z=15; if(c==='blue') z=-15; if(c==='green'){x=-15;z=-15;} if(c==='yellow') x=-15;
-                    const b = new THREE.Mesh(new THREE.CylinderGeometry(5,5,0.2,32), new THREE.MeshStandardMaterial({color:COLORS[c]}));
-                    b.position.set(x,0.1,z); this.scene.add(b);
-                });
-                for(let s=1; s<=4; s++) {
-                    this.safe('red',s,0); this.safe('blue',s,1); this.safe('green',s,2); this.safe('yellow',s,3);
-                }
-            }
-            safe(c, step, rot) {
-                 const v = new THREE.Vector3(0,0,(5-step)*this.s);
-                 const ang = -rot*Math.PI/2;
-                 const rx = v.x*Math.cos(ang)-v.z*Math.sin(ang); const rz = v.x*Math.sin(ang)+v.z*Math.cos(ang);
-                 const m = new THREE.Mesh(new THREE.BoxGeometry(2,0.2,2), new THREE.MeshStandardMaterial({color:COLORS[c]}));
-                 m.position.set(rx, 0.1, rz); this.scene.add(m);
-            }
-            vec(i) {
-                const a=Math.floor(i/10), l=i%10; let x=0,z=0;
-                if(l<5){x=1*this.s; z=(5-l)*this.s;} else {x=(l-3)*this.s; z=1*this.s;}
-                const ang = -a*Math.PI/2;
-                return new THREE.Vector3(x*Math.cos(ang)-z*Math.sin(ang), 0.1, x*Math.sin(ang)+z*Math.cos(ang));
-            }
-            abs(i,c){ let o=0; if(c==='blue')o=10; if(c==='green')o=20; if(c==='yellow')o=30; return (i+o)%40; }
-            pos(i,c,idx) {
-                if(i===-1) {
-                    let x=15, z=15; if(c==='blue') z=-15; if(c==='green') {x=-15; z=-15;} if(c==='yellow') x=-15;
-                    x += (idx%2===0?-1.5:1.5); z += (idx<2?-1.5:1.5);
-                    return new THREE.Vector3(x,0,z);
-                }
-                if(i>=40) {
-                     const st = i-40+1; const v = new THREE.Vector3(0,0,(5-st)*this.s);
-                     let r=0; if(c==='blue')r=1; if(c==='green')r=2; if(c==='yellow')r=3;
-                     const ang = -r*Math.PI/2;
-                     return new THREE.Vector3(v.x*Math.cos(ang)-v.z*Math.sin(ang), 0, v.x*Math.sin(ang)+v.z*Math.cos(ang));
-                }
-                const v = this.vec(this.abs(i,c)); v.y=0; return v;
-            }
-            isTrap(a){return this.traps.includes(a);}
-        }
-
-        class Dice {
-            constructor(s) {
-                const g = new THREE.BoxGeometry(3,3,3); const m=[];
-                for(let i=1;i<=6;i++){
-                    const c=document.createElement('canvas');c.width=64;c.height=64;
-                    const x=c.getContext('2d');x.fillStyle='#eee';x.fillRect(0,0,64,64);
-                    x.fillStyle='red';x.font='40px Arial';x.textAlign='center';x.textBaseline='middle';x.fillText(i,32,32);
-                    x.lineWidth=4;x.strokeRect(0,0,64,64);
-                    m.push(new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
-                }
-                this.m=new THREE.Mesh(g,m); this.m.position.set(0,5,0); s.add(this.m);
-            }
-            anim(v, cb) {
-                let t=0; const i=setInterval(()=>{
-                    this.m.rotation.x+=0.5; this.m.rotation.y+=0.5; t+=50;
-                    if(t>800){clearInterval(i); this.m.rotation.set(0,0,0);
-                    if(v===1)this.m.rotation.y=Math.PI/2; if(v===2)this.m.rotation.y=-Math.PI/2;
-                    if(v===4)this.m.rotation.x=Math.PI; if(v===5)this.m.rotation.x=-Math.PI/2; if(v===6)this.m.rotation.x=Math.PI/2;
-                    cb();}
-                },50);
-            }
-        }
-    </script>
+    });
+</script>
 </body>
 </html>
 
