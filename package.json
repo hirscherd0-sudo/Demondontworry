@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-master",
-  "version": "11.0.0",
-  "description": "Ludo with Server Bots and Classic Board",
+  "name": "horror-ludo-multi-cam",
+  "version": "12.0.0",
+  "description": "Ludo with Player-Specific Camera",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
