@@ -3,291 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klassenbuch Pro</title>
+    <title>Klassenbuch Digital</title>
     
+    <!-- Vue.js 3 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PDF Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #f3f4f6; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
         
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        
-        /* Glassmorphism Card */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        }
+        /* Smooth transitions */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
 
-        /* Toggle Switch */
+        /* Custom Checkbox Toggle */
         .toggle-checkbox:checked { right: 0; border-color: #10b981; }
         .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
 
-        /* Animationen */
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
-
+        /* Hide Vue before load */
         [v-cloak] { display: none; }
     </style>
 </head>
-<body class="text-slate-800 antialiased min-h-screen bg-gradient-to-br from-slate-100 to-blue-50">
+<body>
 
 <div id="app" v-cloak class="min-h-screen flex flex-col">
 
-    <!-- Navbar (nur sichtbar wenn eingeloggt) -->
-    <header v-if="view !== 'login'" class="bg-white/80 backdrop-blur border-b border-slate-200 sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+    <!-- Navbar -->
+    <nav v-if="view !== 'login'" class="bg-white border-b border-slate-200 sticky top-0 z-50 h-16">
+        <div class="max-w-7xl mx-auto px-4 h-full flex justify-between items-center">
             <div class="flex items-center gap-4">
-                <button v-if="view !== 'calendar'" @click="goBack" class="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
-                    <i data-lucide="arrow-left"></i>
+                <button v-if="view !== 'calendar'" @click="goBack" class="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded-full transition">
+                    <i data-lucide="arrow-left" width="20"></i>
                 </button>
-                <div class="flex flex-col">
-                    <h1 class="font-bold text-slate-800 tracking-tight">Klassenbuch Digital</h1>
-                    <span class="text-xs text-slate-500 font-mono">{{ getBreadcrumb() }}</span>
-                </div>
+                <div class="h-6 w-px bg-slate-200 mx-1" v-if="view !== 'calendar'"></div>
+                <h1 class="font-semibold text-slate-800 tracking-tight">Klassenbuch <span class="text-slate-400 font-normal">Digital</span></h1>
             </div>
             
-            <div class="flex items-center gap-4">
-                <div class="px-3 py-1 rounded-full text-xs font-bold border"
-                     :class="role === 'admin' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'">
-                    {{ role === 'admin' ? 'ADMINISTRATOR' : 'GAST' }}
-                </div>
-                <button @click="logout" class="text-slate-400 hover:text-red-600 transition">
+            <div class="flex items-center gap-3">
+                <span class="px-3 py-1 text-xs font-bold tracking-wider rounded-full"
+                      :class="role === 'admin' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'">
+                    {{ role === 'admin' ? 'ADMINISTRATOR' : 'GASTZUGANG' }}
+                </span>
+                <button @click="logout" class="ml-2 text-slate-400 hover:text-red-500 transition" title="Abmelden">
                     <i data-lucide="log-out" width="20"></i>
                 </button>
             </div>
         </div>
-    </header>
+    </nav>
 
-    <!-- Content Area -->
-    <main class="flex-grow flex flex-col items-center justify-start p-6 w-full max-w-7xl mx-auto">
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col items-center p-6 w-full max-w-7xl mx-auto">
 
-        <!-- VIEW 1: Login -->
+        <!-- 1. LOGIN SCREEN -->
         <transition name="fade" mode="out-in">
             <div v-if="view === 'login'" class="flex flex-col items-center justify-center h-[80vh] w-full">
-                <div class="glass-card p-10 rounded-3xl w-full max-w-md text-center">
-                    <div class="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200 text-white transform rotate-3">
-                        <i data-lucide="shield-check" width="40" height="40"></i>
-                    </div>
-                    <h2 class="text-3xl font-bold mb-2 text-slate-800">Willkommen</h2>
-                    <p class="text-slate-400 mb-8">Bitte authentifizieren Sie sich</p>
-                    
-                    <form @submit.prevent="handleLogin" class="relative">
-                        <div class="relative">
-                            <i data-lucide="key" class="absolute left-4 top-3.5 text-slate-400" width="18"></i>
-                            <input type="password" v-model="password" placeholder="Zugangscode eingeben" 
-                                   class="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition text-slate-700 font-medium placeholder:text-slate-400">
+                <div class="bg-white p-10 rounded-2xl shadow-xl w-full max-w-sm border border-slate-100 text-center">
+                    <div class="mb-8 flex justify-center">
+                        <div class="w-12 h-12 bg-slate-900 rounded-lg flex items-center justify-center text-white shadow-lg shadow-slate-200">
+                            <i data-lucide="lock" width="20"></i>
                         </div>
-                        <button type="submit" class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
-                            Anmelden
+                    </div>
+                    <h2 class="text-xl font-bold text-slate-900 mb-1">Anmelden</h2>
+                    <p class="text-slate-400 text-sm mb-8">Geben Sie Ihren Zugangscode ein</p>
+                    
+                    <form @submit.prevent="handleLogin" class="space-y-4">
+                        <input type="password" v-model="password" placeholder="Passwort" autocomplete="off"
+                               class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition text-sm font-medium">
+                        
+                        <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-3 rounded-lg text-sm font-bold shadow-md transition-all transform hover:-translate-y-0.5">
+                            Weiter
                         </button>
                     </form>
-                    <p v-if="error" class="text-red-500 text-sm mt-4 font-medium bg-red-50 py-2 rounded-lg">{{ error }}</p>
+                    
+                    <p v-if="error" class="mt-4 text-xs text-red-500 font-medium bg-red-50 py-2 rounded">{{ error }}</p>
                 </div>
+                <p class="mt-8 text-xs text-slate-300 font-mono">System v3.0 • Secure Access</p>
             </div>
 
-            <!-- VIEW 2: Calendar / Week Overview -->
-            <div v-else-if="view === 'calendar'" class="w-full max-w-4xl mt-8">
-                <div class="flex justify-between items-end mb-8">
+            <!-- 2. CALENDAR / DASHBOARD -->
+            <div v-else-if="view === 'calendar'" class="w-full max-w-5xl mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
                     <div>
                         <h2 class="text-2xl font-bold text-slate-800">Wochenübersicht</h2>
-                        <p class="text-slate-500">Wählen Sie einen Tag zur Bearbeitung</p>
+                        <p class="text-slate-500">Wählen Sie einen Tag aus</p>
                     </div>
                     
-                    <div class="flex gap-2">
-                         <button @click="changeWeek(-1)" class="p-2 bg-white border rounded-lg hover:bg-slate-50"><i data-lucide="chevron-left"></i></button>
-                         <button @click="changeWeek(0)" class="px-4 py-2 bg-white border rounded-lg text-sm font-bold hover:bg-slate-50">Heute</button>
-                         <button @click="changeWeek(1)" class="p-2 bg-white border rounded-lg hover:bg-slate-50"><i data-lucide="chevron-right"></i></button>
+                    <div class="flex bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
+                         <button @click="changeWeek(-1)" class="p-2 hover:bg-slate-50 rounded text-slate-500"><i data-lucide="chevron-left" width="18"></i></button>
+                         <div class="px-4 py-2 text-sm font-semibold text-slate-700 border-x border-slate-100 min-w-[140px] text-center">
+                            {{ getWeekLabel() }}
+                         </div>
+                         <button @click="changeWeek(1)" class="p-2 hover:bg-slate-50 rounded text-slate-500"><i data-lucide="chevron-right" width="18"></i></button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <button v-for="(date, index) in currentWeek" :key="date" @click="selectDay(date)"
-                            class="glass-card p-6 rounded-2xl text-left transition-all hover:border-blue-400 hover:shadow-lg group relative overflow-hidden">
-                        <div class="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition">
-                            <i data-lucide="calendar" width="60" height="60"></i>
-                        </div>
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <!-- Day Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-12">
+                    <div v-for="(date, index) in currentWeek" :key="date" @click="selectDay(date)"
+                            class="bg-white p-6 rounded-xl border border-slate-200 cursor-pointer transition-all hover:border-blue-500 hover:shadow-lg group relative overflow-hidden h-40 flex flex-col justify-between">
+                        <span class="text-xs font-bold uppercase text-slate-400 tracking-wider">
                             {{ ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'][index] }}
                         </span>
-                        <span class="text-2xl font-bold text-slate-800 group-hover:text-blue-600 block">
-                            {{ formatDateShort(date) }}
-                        </span>
-                        <span class="text-xs text-blue-500 font-medium mt-4 inline-block opacity-0 group-hover:opacity-100 transition-opacity">
-                            Öffnen &rarr;
-                        </span>
-                    </button>
-                </div>
-
-                <!-- Admin Only: PDF Export -->
-                <div v-if="role === 'admin'" class="mt-12 text-center border-t border-slate-200 pt-8">
-                    <button @click="generateMatrixPDF" class="inline-flex items-center gap-2 bg-slate-800 text-white px-6 py-3 rounded-xl hover:bg-slate-700 transition shadow-lg">
-                        <i data-lucide="file-spreadsheet"></i>
-                        Wochenbericht exportieren (PDF A4 Quer)
-                    </button>
-                    <p class="text-xs text-slate-400 mt-2">Exportiert alle Stunden (Mo-Fr) in einer Matrix.</p>
-                </div>
-            </div>
-
-            <!-- VIEW 3: Period Selection -->
-            <div v-else-if="view === 'periods'" class="w-full max-w-3xl mt-8">
-                <div class="text-center mb-10">
-                    <h2 class="text-3xl font-bold text-slate-800">{{ getDayName(selectedDate) }}</h2>
-                    <p class="text-slate-500 font-medium">{{ formatDateLong(selectedDate) }}</p>
-                </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <button v-for="i in 8" :key="i" @click="selectPeriod(i)"
-                            class="aspect-square glass-card rounded-2xl flex flex-col items-center justify-center hover:scale-105 hover:border-blue-500 transition-all cursor-pointer group">
-                        <span class="text-5xl font-black text-slate-200 group-hover:text-blue-600 transition-colors">{{ i }}</span>
-                        <span class="text-xs font-bold uppercase text-slate-400 mt-2 tracking-widest group-hover:text-slate-600">Stunde</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- VIEW 4: Attendance List -->
-            <div v-else-if="view === 'list'" class="w-full max-w-4xl mt-4">
-                <div class="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-                    <!-- List Header -->
-                    <div class="bg-slate-50 px-8 py-5 border-b border-slate-200 flex justify-between items-center">
                         <div>
-                            <div class="flex items-center gap-2">
-                                <span class="bg-blue-600 text-white text-xs font-bold px-2 py-1 rounded">{{ selectedPeriod }}. Std</span>
-                                <span class="font-bold text-slate-700">{{ getDayName(selectedDate) }}</span>
-                            </div>
-                            <h2 class="text-xl font-bold text-slate-900 mt-1">Anwesenheitsliste</h2>
+                            <span class="text-3xl font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+                                {{ formatDateDay(date) }}
+                            </span>
+                            <span class="block text-sm text-slate-400">{{ formatDateMonth(date) }}</span>
                         </div>
-                        
+                        <div class="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 text-blue-500">
+                            <i data-lucide="arrow-right" width="20"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Action: PDF Export -->
+                <div v-if="role === 'admin'" class="flex justify-center border-t border-slate-200 pt-8">
+                    <button @click="generateMatrixPDF" class="flex items-center gap-3 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-6 py-3 rounded-xl font-medium shadow-sm transition-all">
+                        <i data-lucide="file-spreadsheet" width="20"></i>
+                        <span>Wochenbericht exportieren (A4 Quer)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. PERIOD SELECTOR -->
+            <div v-else-if="view === 'periods'" class="w-full max-w-4xl mt-8">
+                <div class="text-center mb-12">
+                    <span class="text-blue-600 font-bold uppercase tracking-widest text-xs mb-2 block">Stundenplan</span>
+                    <h2 class="text-3xl font-bold text-slate-900">{{ getDayName(selectedDate) }}</h2>
+                    <p class="text-slate-500 mt-1">{{ formatDateFull(selectedDate) }}</p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <button v-for="i in 8" :key="i" @click="selectPeriod(i)"
+                            class="aspect-square bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center justify-center hover:scale-105 hover:border-blue-500 hover:shadow-xl transition-all group">
+                        <span class="text-4xl font-black text-slate-200 group-hover:text-blue-600 transition-colors mb-2">{{ i }}</span>
+                        <span class="text-xs font-bold uppercase text-slate-400 group-hover:text-slate-600">Stunde</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. ATTENDANCE LIST -->
+            <div v-else-if="view === 'list'" class="w-full max-w-5xl">
+                <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                    <!-- Header -->
+                    <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div>
+                            <div class="flex items-center gap-3 mb-1">
+                                <span class="bg-slate-900 text-white text-xs font-bold px-2 py-0.5 rounded">{{ selectedPeriod }}. Stunde</span>
+                                <span class="text-slate-400 text-sm font-medium">{{ formatDateFull(selectedDate) }}</span>
+                            </div>
+                            <h2 class="text-2xl font-bold text-slate-800">Anwesenheit erfassen</h2>
+                        </div>
                         <div class="text-right">
-                             <div class="text-3xl font-bold text-slate-800">
-                                 {{ students.filter(s => s.present).length }}<span class="text-slate-300 text-lg">/{{ students.length }}</span>
-                             </div>
-                             <div class="text-xs text-slate-500 uppercase tracking-wide font-bold">Anwesend</div>
+                             <span class="block text-3xl font-bold text-slate-900">{{ students.filter(s => s.present).length }}<span class="text-slate-300 text-xl">/{{ students.length }}</span></span>
+                             <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Anwesend</span>
                         </div>
                     </div>
 
-                    <!-- Table -->
+                    <!-- List -->
                     <div class="overflow-x-auto">
                         <table class="w-full text-left border-collapse">
                             <thead>
-                                <tr class="bg-white border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider">
-                                    <th class="px-8 py-4 font-bold">Name des Schülers</th>
-                                    <th class="px-6 py-4 font-bold text-center w-32">Status</th>
-                                    <th class="px-8 py-4 font-bold">Anmerkung</th>
-                                    <th v-if="role === 'admin'" class="px-4 py-4 w-12"></th>
+                                <tr class="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
+                                    <th class="px-8 py-4 w-1/3">Name</th>
+                                    <th class="px-6 py-4 text-center w-32">Status</th>
+                                    <th class="px-8 py-4">Anmerkung</th>
+                                    <th v-if="role === 'admin'" class="px-4 py-4 w-16"></th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-slate-50">
+                            <tbody class="divide-y divide-slate-100">
                                 <tr v-for="(student, index) in students" :key="student.id" class="group hover:bg-slate-50 transition-colors">
-                                    
-                                    <!-- Name Column -->
                                     <td class="px-8 py-4">
                                         <input v-if="role === 'admin'" type="text" v-model="student.name" @change="saveData"
-                                               class="w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none font-semibold text-slate-700">
-                                        <span v-else class="font-semibold text-slate-700">{{ student.name }}</span>
+                                               class="w-full bg-transparent border-none p-0 font-medium text-slate-800 focus:ring-0 placeholder:text-slate-300">
+                                        <span v-else class="font-medium text-slate-800">{{ student.name }}</span>
                                     </td>
-
-                                    <!-- Toggle Column -->
+                                    
                                     <td class="px-6 py-4 flex justify-center">
                                         <div class="relative inline-block w-12 mr-2 align-middle select-none">
-                                            <input type="checkbox" :id="'toggle-'+index" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
-                                                   style="top:0; left:0; transition: all 0.3s;"
+                                            <input type="checkbox" :id="'toggle-'+index" 
+                                                   class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer transition-all duration-300"
+                                                   style="top:0; left:0;"
                                                    v-model="student.present" @change="saveData">
-                                            <label :for="'toggle-'+index" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-200 cursor-pointer border border-slate-200 transition-colors"
-                                                   :class="{'bg-green-500 border-green-500': student.present, 'bg-red-400 border-red-400': !student.present}"></label>
+                                            <label :for="'toggle-'+index" 
+                                                   class="toggle-label block overflow-hidden h-6 rounded-full cursor-pointer border transition-colors duration-300"
+                                                   :class="student.present ? 'bg-emerald-500 border-emerald-500' : 'bg-red-400 border-red-400'"></label>
                                         </div>
                                     </td>
 
-                                    <!-- Notes Column with "Ungeklärt" Logic -->
                                     <td class="px-8 py-4">
                                         <div class="relative">
+                                            <!-- Logic for Ungeklärt: If absent AND no note -->
                                             <input type="text" v-model="student.note" @change="saveData" :readonly="role === 'guest'"
                                                    :class="{
-                                                       'bg-red-100 text-red-700 border-red-200 placeholder-red-400': !student.present && !student.note,
-                                                       'bg-slate-50 border-slate-200': student.present || student.note
+                                                       'bg-red-50 text-red-600 border-red-200 font-bold placeholder:text-red-400': !student.present && !student.note,
+                                                       'bg-white border-slate-200 text-slate-600': student.present || student.note
                                                    }"
-                                                   class="w-full text-sm rounded-lg border px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                                                   :placeholder="!student.present && !student.note ? 'UNGEKLÄRT' : 'Anmerkung eingeben...'">
+                                                   class="w-full text-sm rounded-md border px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                                                   :placeholder="!student.present && !student.note ? 'UNGEKLÄRT' : 'Anmerkung...'">
                                         </div>
                                     </td>
 
-                                    <!-- Delete Action -->
-                                    <td v-if="role === 'admin'" class="px-4 py-4 text-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button @click="removeStudent(index)" class="text-slate-300 hover:text-red-500 transition">
+                                    <td v-if="role === 'admin'" class="px-4 py-4 text-center">
+                                        <button @click="removeStudent(index)" class="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition">
                                             <i data-lucide="trash-2" width="18"></i>
                                         </button>
                                     </td>
                                 </tr>
                                 <tr v-if="students.length === 0">
-                                    <td colspan="4" class="px-8 py-10 text-center text-slate-400 italic">Die Liste ist noch leer.</td>
+                                    <td colspan="4" class="px-8 py-12 text-center text-slate-400 italic">
+                                        Keine Schüler eingetragen.
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <!-- Admin Add Row -->
-                    <div v-if="role === 'admin'" class="bg-slate-50 px-8 py-4 border-t border-slate-200 flex gap-4">
-                        <input type="text" v-model="newStudentName" placeholder="Neuer Schüler..." 
-                               class="flex-1 bg-white border border-slate-300 rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500">
-                        <button @click="addStudent" class="bg-slate-800 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 transition">
-                            Hinzufügen
-                        </button>
+                    <!-- Footer Add Row -->
+                    <div v-if="role === 'admin'" class="bg-slate-50 px-8 py-4 border-t border-slate-200">
+                        <form @submit.prevent="addStudent" class="flex gap-3">
+                            <input type="text" v-model="newStudentName" placeholder="Neuen Schülernamen eingeben..." 
+                                   class="flex-1 bg-white border border-slate-300 rounded-lg px-4 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <button type="submit" class="bg-slate-800 text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-slate-700 transition shadow-sm">
+                                Hinzufügen
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
+
         </transition>
 
     </main>
 
-    <!-- HIDDEN TABLE FOR PDF EXPORT -->
-    <div id="pdf-export-container" class="hidden">
-        <div class="p-4" style="font-family: sans-serif;">
-            <h1 style="font-size: 18px; font-weight: bold; margin-bottom: 5px;">Anwesenheitsmatrix</h1>
-            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Woche: {{ currentWeek[0] }} bis {{ currentWeek[4] }}</p>
-            
+    <!-- HIDDEN PDF TEMPLATE (Landscape Matrix) -->
+    <div id="pdf-container" class="hidden">
+        <div style="font-family: sans-serif; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
+                <div>
+                    <h1 style="font-size: 24px; font-weight: bold; margin: 0;">Anwesenheitsmatrix</h1>
+                    <p style="font-size: 14px; color: #666; margin: 5px 0 0 0;">Wochenübersicht</p>
+                </div>
+                <div style="text-align: right;">
+                    <p style="font-size: 14px; font-weight: bold;">{{ currentWeek[0] }} bis {{ currentWeek[4] }}</p>
+                    <p style="font-size: 10px; color: #999;">Generiert am: {{ new Date().toLocaleDateString() }}</p>
+                </div>
+            </div>
+
             <table style="width: 100%; border-collapse: collapse; font-size: 9px;">
                 <thead>
                     <tr>
-                        <th style="border: 1px solid #333; padding: 4px; background: #eee; width: 150px; text-align: left;">Name</th>
-                        <!-- 5 Days * 8 Periods Header -->
+                        <th style="border: 1px solid #000; padding: 6px; background: #e2e8f0; width: 180px; text-align: left;">Name</th>
+                        <!-- Loop Days -->
                         <template v-for="(day, dIndex) in ['Mo', 'Di', 'Mi', 'Do', 'Fr']">
-                            <th v-for="p in 8" style="border: 1px solid #333; width: 20px; text-align: center; background: #eee;">
-                                {{ day }}{{ p }}
+                            <th v-for="p in 8" style="border: 1px solid #94a3b8; width: 22px; text-align: center; background: #f1f5f9; color: #334155;">
+                                {{ day.charAt(0) }}{{ p }}
                             </th>
                         </template>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="student in matrixData" :key="student.name">
-                        <td style="border: 1px solid #333; padding: 4px; font-weight: bold;">{{ student.name }}</td>
-                        <!-- 5 Days * 8 Periods Cells -->
-                        <template v-for="dIndex in 5"> <!-- 0 to 4 -->
+                    <tr v-for="(student, sIndex) in matrixData" :key="sIndex">
+                        <td style="border: 1px solid #000; padding: 5px; font-weight: bold;">{{ student.name }}</td>
+                        <!-- Loop Cells -->
+                        <template v-for="dIndex in 5">
                             <td v-for="p in 8" 
                                 :style="{
-                                    border: '1px solid #ccc',
-                                    backgroundColor: getMatrixColor(student, dIndex-1, p)
-                                }"
-                            >
-                            <!-- Empty cell, just color -->
+                                    border: '1px solid #cbd5e1',
+                                    backgroundColor: getMatrixColor(student, dIndex-1, p),
+                                    textAlign: 'center'
+                                }">
                             </td>
                         </template>
                     </tr>
                 </tbody>
             </table>
-            <div style="margin-top: 10px; font-size: 10px;">
-                <span style="display:inline-block; width: 10px; height: 10px; background: #86efac; border: 1px solid #333; margin-right: 5px;"></span> Anwesend
-                <span style="display:inline-block; width: 10px; height: 10px; background: #fca5a5; border: 1px solid #333; margin-left: 10px; margin-right: 5px;"></span> Abwesend
-                <span style="display:inline-block; width: 10px; height: 10px; background: white; border: 1px solid #333; margin-left: 10px; margin-right: 5px;"></span> Keine Daten
+            
+            <div style="margin-top: 20px; font-size: 10px; display: flex; gap: 20px;">
+                <div style="display: flex; items-center: center;">
+                    <span style="display:inline-block; width: 12px; height: 12px; background: #86efac; border: 1px solid #000; margin-right: 5px;"></span> Anwesend
+                </div>
+                <div style="display: flex; items-center: center;">
+                    <span style="display:inline-block; width: 12px; height: 12px; background: #fca5a5; border: 1px solid #000; margin-right: 5px;"></span> Abwesend
+                </div>
             </div>
         </div>
     </div>
@@ -300,22 +305,22 @@
     createApp({
         data() {
             return {
-                view: 'login',
-                role: null,
+                view: 'login', // login, calendar, periods, list
+                role: null, // admin, guest
                 password: '',
                 error: '',
                 
-                // Calendar Logic
+                // Calendar State
                 weekOffset: 0,
-                currentWeek: [], // Array of YYYY-MM-DD
+                currentWeek: [], // Array of date strings
                 selectedDate: null,
                 selectedPeriod: null,
 
-                // Data
+                // List Data
                 students: [],
                 newStudentName: '',
                 
-                // PDF Matrix Data
+                // PDF Data
                 matrixData: []
             }
         },
@@ -326,35 +331,38 @@
             lucide.createIcons();
         },
         methods: {
-            // --- Navigation & Auth ---
+            // AUTH
             handleLogin() {
-                if(this.password === 'Admin') { this.role = 'admin'; this.view = 'calendar'; }
-                else if(this.password === 'Gast') { this.role = 'guest'; this.view = 'calendar'; }
-                else { this.error = 'Ungültiges Passwort'; return; }
+                if (this.password === 'Admin') {
+                    this.role = 'admin';
+                    this.view = 'calendar';
+                    this.error = '';
+                } else if (this.password === 'Gast') {
+                    this.role = 'guest';
+                    this.view = 'calendar';
+                    this.error = '';
+                } else {
+                    this.error = 'Zugangscode ungültig.';
+                }
                 this.password = '';
-                this.error = '';
             },
             logout() {
                 this.role = null;
                 this.view = 'login';
                 this.students = [];
             },
+            
+            // NAVIGATION
             goBack() {
                 if(this.view === 'list') this.view = 'periods';
                 else if(this.view === 'periods') this.view = 'calendar';
             },
-            getBreadcrumb() {
-                if(this.view === 'login') return '';
-                if(this.view === 'calendar') return 'Wochenübersicht';
-                if(this.view === 'periods') return `Stundenplan > ${this.formatDateShort(this.selectedDate)}`;
-                if(this.view === 'list') return `${this.formatDateShort(this.selectedDate)} > ${this.selectedPeriod}. Stunde`;
-            },
 
-            // --- Calendar Logic ---
+            // CALENDAR LOGIC
             updateWeek() {
                 const curr = new Date();
-                // Move to Monday of current week + offset
                 const day = curr.getDay();
+                // Montag berechnen
                 const diff = curr.getDate() - day + (day === 0 ? -6 : 1) + (this.weekOffset * 7);
                 const monday = new Date(curr.setDate(diff));
                 
@@ -366,32 +374,45 @@
                 }
             },
             changeWeek(delta) {
-                if (delta === 0) this.weekOffset = 0;
+                if(delta === 0) this.weekOffset = 0;
                 else this.weekOffset += delta;
                 this.updateWeek();
             },
+            getWeekLabel() {
+                if(!this.currentWeek.length) return '';
+                const start = this.currentWeek[0].split('-').reverse().slice(0,2).join('.');
+                const end = this.currentWeek[4].split('-').reverse().slice(0,2).join('.');
+                return `${start} - ${end}`;
+            },
+
+            // SELECTIONS
             selectDay(date) {
                 this.selectedDate = date;
                 this.view = 'periods';
             },
             selectPeriod(p) {
                 this.selectedPeriod = p;
-                this.fetchList();
+                this.fetchData();
                 this.view = 'list';
             },
 
-            // --- API Operations ---
-            async fetchList() {
+            // DATA OPERATIONS
+            async fetchData() {
                 try {
                     const res = await fetch(`/api/attendance/${this.selectedDate}/${this.selectedPeriod}`);
+                    if(!res.ok) throw new Error('Fetch failed');
                     this.students = await res.json();
-                } catch(e) { console.error(e); }
+                } catch(e) {
+                    console.error(e);
+                    this.students = [];
+                }
             },
             async saveData() {
+                // Optimistic UI, no loading spinner needed
                 try {
                     await fetch('/api/attendance', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             date: this.selectedDate,
                             period: this.selectedPeriod,
@@ -409,68 +430,64 @@
                     note: ''
                 });
                 this.newStudentName = '';
+                // Sortieren
                 this.students.sort((a,b) => a.name.localeCompare(b.name));
                 this.saveData();
             },
             removeStudent(index) {
-                if(confirm('Schüler entfernen?')) {
+                if(confirm('Diesen Eintrag wirklich löschen?')) {
                     this.students.splice(index, 1);
                     this.saveData();
                 }
             },
 
-            // --- PDF Matrix Export ---
+            // PDF MATRIX
             async generateMatrixPDF() {
-                // 1. Fetch aggregated data
-                const res = await fetch('/api/matrix', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ weekDates: this.currentWeek })
-                });
-                this.matrixData = await res.json();
-
-                // 2. Wait for DOM to update hidden table
-                this.$nextTick(() => {
-                    const element = document.getElementById('pdf-export-container');
-                    element.classList.remove('hidden'); // Show briefly for render
-                    
-                    const opt = {
-                        margin: 5,
-                        filename: `Wochenmatrix_KW.pdf`,
-                        image: { type: 'jpeg', quality: 0.98 },
-                        html2canvas: { scale: 2 },
-                        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-                    };
-
-                    html2pdf().set(opt).from(element).save().then(() => {
-                        element.classList.add('hidden'); // Hide again
+                // 1. Daten holen
+                try {
+                    const res = await fetch('/api/matrix', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ weekDates: this.currentWeek })
                     });
-                });
+                    this.matrixData = await res.json();
+                    
+                    // 2. Warten auf DOM Rendering
+                    this.$nextTick(() => {
+                        const element = document.getElementById('pdf-container');
+                        element.classList.remove('hidden');
+
+                        const opt = {
+                            margin: 10,
+                            filename: `Anwesenheitsmatrix_KW.pdf`,
+                            image: { type: 'jpeg', quality: 0.98 },
+                            html2canvas: { scale: 2 },
+                            jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                        };
+
+                        html2pdf().set(opt).from(element).save().then(() => {
+                            element.classList.add('hidden');
+                        });
+                    });
+                } catch (e) {
+                    alert("Fehler beim Generieren der Matrix: " + e.message);
+                }
             },
             getMatrixColor(student, dayIndex, period) {
-                // Key format matches server generation: "dayIndex_period" (e.g. "0_1")
+                // Key format vom Server: "0_1" (Montag, 1. Stunde)
                 const key = `${dayIndex}_${period}`;
-                const status = student.slots[key];
+                const val = student.slots[key];
                 
-                if (status === true) return '#86efac'; // Green (Tailwind green-300)
-                if (status === false) return '#fca5a5'; // Red (Tailwind red-300)
-                return 'white'; // No record
+                if (val === true) return '#86efac'; // Green
+                if (val === false) return '#fca5a5'; // Red
+                return 'transparent'; // Leer
             },
 
-            // --- Helpers ---
-            formatDateShort(d) {
-                if(!d) return '';
-                const parts = d.split('-');
-                return `${parts[2]}.${parts[1]}.`;
-            },
-            formatDateLong(d) {
-                 if(!d) return '';
-                 return new Date(d).toLocaleDateString('de-DE', { dateStyle: 'full' });
-            },
-            getDayName(d) {
-                if(!d) return '';
-                return new Date(d).toLocaleDateString('de-DE', { weekday: 'long' });
-            }
+            // FORMATTERS
+            formatDateDay(d) { return d ? d.split('-')[2] : ''; },
+            formatDateMonth(d) { return d ? new Date(d).toLocaleDateString('de-DE', { month: 'long' }) : ''; },
+            formatDateFull(d) { return d ? new Date(d).toLocaleDateString('de-DE', { dateStyle: 'full' }) : ''; },
+            getDayName(d) { return d ? new Date(d).toLocaleDateString('de-DE', { weekday: 'long' }) : ''; }
         }
     });
 </script>
