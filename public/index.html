@@ -60,8 +60,9 @@
         #force-start-btn { margin-top: 20px; font-size: 1rem; padding: 10px 20px; display: none; }
 
     </style>
-    <!-- UPDATED LIBRARIES FOR CAPSULE GEOMETRY -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r146/three.min.js"></script>
+    
+    <!-- LIBRARIES (R146) -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -86,7 +87,7 @@
         <div class="bottom-bar">
             <div style="text-align:center;">
                 <div id="status-msg">Spiel startet...</div>
-                <button id="btn-action" class="btn-horror" style="display:none;" onclick="game.roll()">WÜRFELN</button>
+                <button id="btn-action" class="btn-horror" style="display:none;" onclick="tryRoll()">WÜRFELN</button>
             </div>
         </div>
     </div>
@@ -124,14 +125,64 @@
     </div>
 
     <script>
-        document.getElementById('room-input').value = "Friedhof_" + Math.floor(Math.random()*1000);
-        const socket = io();
+        // GLOBAL SCOPE WRAPPER
+        let socket, game;
+        let myData = { color:null, figure:null, isHost:false };
         const COLORS = { red: 0xaa0000, blue: 0x0000aa, green: 0x006600, yellow: 0xdddd00 };
         const QUESTIONS = [{q:"Killer in Halloween?", a:["Michael","Jason","Freddy"], c:0}, {q:"Regisseur Psycho?", a:["Hitchcock","Spielberg","Lucas"], c:0}];
 
-        let myData = { color:null, figure:null, isHost:false };
-        let game = null;
+        // WICHTIG: Alles erst ausführen, wenn Libraries da sind
+        window.onload = function() {
+            if (typeof THREE === 'undefined') {
+                alert("FEHLER: 3D Engine konnte nicht geladen werden. Bitte Adblocker prüfen.");
+                return;
+            }
+            if (typeof io === 'undefined') {
+                alert("FEHLER: Socket.io konnte nicht geladen werden.");
+                return;
+            }
 
+            initApp();
+        };
+
+        function initApp() {
+            document.getElementById('room-input').value = "Friedhof_" + Math.floor(Math.random()*1000);
+            socket = io();
+
+            socket.on('setIdentity', data => {
+                myData = data;
+                document.getElementById('my-name').innerText = data.figure;
+                document.getElementById('my-name').style.color = '#'+COLORS[data.color].toString(16);
+                document.getElementById('my-dot').style.background = '#'+COLORS[data.color].toString(16);
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('lobby-screen').classList.remove('hidden');
+            });
+
+            socket.on('youAreHost', () => { myData.isHost=true; updateLobby(); });
+
+            socket.on('lobbyUpdate', data => {
+                document.getElementById('lobby-list').innerHTML = data.players.map(p => 
+                    `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
+                ).join('');
+                if(data.hostId === socket.id) myData.isHost = true;
+                updateLobby();
+            });
+
+            socket.on('prepareGame', data => {
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('loading-screen').classList.remove('hidden');
+                runLoader(data);
+            });
+
+            socket.on('gameLive', () => {
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('hud-layer').classList.remove('hidden');
+            });
+
+            socket.on('errorMsg', msg => alert(msg));
+        }
+
+        // Global functions for buttons
         function join() {
             const r = document.getElementById('room-input').value;
             if(r) socket.emit('joinGame', r);
@@ -139,26 +190,13 @@
         function start() {
             socket.emit('requestStartGame', document.getElementById('room-input').value);
         }
-
-        socket.on('setIdentity', data => {
-            myData = data;
-            document.getElementById('my-name').innerText = data.figure;
-            document.getElementById('my-name').style.color = '#'+COLORS[data.color].toString(16);
-            document.getElementById('my-dot').style.background = '#'+COLORS[data.color].toString(16);
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('lobby-screen').classList.remove('hidden');
-        });
-
-        socket.on('youAreHost', () => { myData.isHost=true; updateLobby(); });
-
-        socket.on('lobbyUpdate', data => {
-            document.getElementById('lobby-list').innerHTML = data.players.map(p => 
-                `<div style="color:${p.color}">${p.name} (${p.figure})</div>`
-            ).join('');
-            if(data.hostId === socket.id) myData.isHost = true;
-            updateLobby();
-        });
-
+        function tryRoll() {
+            if(game) game.roll();
+        }
+        function forceGameStart() {
+            document.getElementById('loading-screen').classList.add('hidden');
+            document.getElementById('hud-layer').classList.remove('hidden');
+        }
         function updateLobby() {
             const btn = document.getElementById('btn-start');
             if(myData.isHost) {
@@ -166,17 +204,6 @@
                 document.getElementById('lobby-wait-text').innerText = "Du bist Host.";
             }
         }
-
-        socket.on('prepareGame', data => {
-            document.getElementById('lobby-screen').classList.add('hidden');
-            document.getElementById('loading-screen').classList.remove('hidden');
-            runLoader(data);
-        });
-
-        socket.on('gameLive', () => {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('hud-layer').classList.remove('hidden');
-        });
 
         async function runLoader(data) {
             const l = document.getElementById('loading-log');
@@ -199,14 +226,6 @@
                 console.error(e);
             }
         }
-
-        function forceGameStart() {
-            document.getElementById('loading-screen').classList.add('hidden');
-            document.getElementById('hud-layer').classList.remove('hidden');
-        }
-
-        socket.on('errorMsg', msg => alert(msg));
-
 
         // --- ENGINE ---
         class Game3D {
