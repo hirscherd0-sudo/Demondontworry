@@ -1,7 +1,7 @@
 {
-  "name": "digitales-klassenbuch-pro",
-  "version": "2.0.0",
-  "description": "Premium Anwesenheitsliste mit Matrix-Export",
+  "name": "klassenbuch-enterprise",
+  "version": "3.0.0",
+  "description": "Premium Anwesenheitsliste",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
