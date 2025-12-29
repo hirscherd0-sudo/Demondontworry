@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
 
         if (room.status === 'playing') {
-            socket.emit('errorMsg', 'Spiel läuft bereits! Warte bis es vorbei ist oder wähle einen neuen Raum.');
+            socket.emit('errorMsg', 'Spiel läuft bereits!');
             return;
         }
 
@@ -73,7 +73,6 @@ io.on('connection', (socket) => {
             const colors = ['red', 'blue', 'green', 'yellow'];
             const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
             const c = colors[room.players.length];
-            
             const p = { id: socket.id, color: c, isBot: false, name: `Spieler ${room.players.length + 1}`, figure: figures[c] };
             room.players.push(p);
 
@@ -96,14 +95,16 @@ io.on('connection', (socket) => {
         }
 
         room.status = 'playing';
-        // Wir senden "prepareGame" statt sofort loszulegen, damit Clients laden können
+        
+        // 1. Daten senden zum Laden
         io.to(roomId).emit('prepareGame', { players: room.players, trapFields: room.trapFields });
         
-        // Kurze Verzögerung auf Server-Seite, dann erster Zug
+        // 2. Warten und dann Spiel starten
         setTimeout(() => {
+            io.to(roomId).emit('gameLive'); // Signal: Ladebildschirm weg
             room.turnIndex = -1;
             nextTurn(roomId);
-        }, 3000); // 3 Sekunden Puffer für Ladebildschirm der Clients
+        }, 4000); 
     });
 
     socket.on('rollDice', ({ roomId }) => {
