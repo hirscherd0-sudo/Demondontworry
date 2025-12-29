@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-loading",
-  "version": "7.0.0",
-  "description": "Ludo with Loading Screen",
+  "name": "horror-ludo-bulletproof",
+  "version": "8.0.0",
+  "description": "Ludo with robust loading",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
