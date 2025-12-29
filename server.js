@@ -10,7 +10,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const rooms = {};
 const socketRoomMap = {};
-const TURN_TIMEOUT = 25000;
+const TURN_TIMEOUT = 30000; // 30s Zeit
 
 function generateTrapFields() {
     const traps = [];
@@ -65,7 +65,7 @@ io.on('connection', (socket) => {
         const room = rooms[roomId];
 
         if (room.status === 'playing') {
-            socket.emit('errorMsg', 'Spiel läuft bereits! Wähle einen anderen Raum.');
+            socket.emit('errorMsg', 'Spiel läuft bereits!');
             return;
         }
 
@@ -73,6 +73,7 @@ io.on('connection', (socket) => {
             const colors = ['red', 'blue', 'green', 'yellow'];
             const figures = {'red': 'Mörder-Puppe', 'blue': 'Grabkreuz', 'green': 'Grabstein', 'yellow': 'Poltergeist'};
             const c = colors[room.players.length];
+            
             const p = { id: socket.id, color: c, isBot: false, name: `Spieler ${room.players.length + 1}`, figure: figures[c] };
             room.players.push(p);
 
@@ -125,7 +126,6 @@ io.on('connection', (socket) => {
             const room = rooms[roomId];
             room.players = room.players.filter(p => p.id !== socket.id);
             const humans = room.players.filter(p => !p.isBot);
-            
             if (humans.length === 0) {
                 if(room.timer) clearTimeout(room.timer);
                 delete rooms[roomId];
