@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horror Ludo Fixed</title>
+    <title>Horror Ludo Final</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Creepster&family=Roboto:wght@400;700&display=swap');
 
         body { margin: 0; overflow: hidden; background-color: #000; color: #eee; font-family: 'Roboto', sans-serif; }
 
-        /* CANVAS */
         #game-canvas { display: block; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; }
 
-        /* HUD */
         #hud-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between;
@@ -37,7 +35,6 @@
         .btn-horror:hover { background: #aa0000; transform: scale(1.05); }
         .btn-horror:disabled { background: #333; border-color: #555; color: #777; box-shadow: none; transform: none; cursor: default;}
 
-        /* OVERLAYS */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(5, 0, 0, 0.98); z-index: 50;
@@ -50,7 +47,6 @@
         .quiz-opt { background: #222; padding: 15px; margin: 5px; width: 300px; border: 1px solid #555; cursor: pointer; text-align: left; }
         .quiz-opt:hover { border-color: red; background: #440000; }
 
-        /* LOADING */
         #loading-bar-container {
             width: 80%; max-width: 600px; height: 30px; background: #220000; 
             border: 2px solid #660000; border-radius: 15px; margin-top: 20px; overflow: hidden;
@@ -64,8 +60,9 @@
         #force-start-btn { margin-top: 20px; font-size: 1rem; padding: 10px 20px; display: none; }
 
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- UPDATED LIBRARIES FOR CAPSULE GEOMETRY -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r146/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.146.0/examples/js/controls/OrbitControls.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
@@ -97,7 +94,7 @@
     <!-- SCREENS -->
     <div id="login-screen" class="overlay">
         <h1 style="font-family:'Creepster'; font-size:5rem; color:red; margin:0;">HORROR LUDO</h1>
-        <p style="color:#888;">Finale Version</p>
+        <p style="color:#888;">Complete Edition</p>
         <br>
         <input type="text" id="room-input" placeholder="Raum Name">
         <button class="btn-horror" onclick="join()">BEITRETEN</button>
@@ -170,7 +167,6 @@
             }
         }
 
-        // --- LOADING ---
         socket.on('prepareGame', data => {
             document.getElementById('lobby-screen').classList.add('hidden');
             document.getElementById('loading-screen').classList.remove('hidden');
@@ -188,23 +184,15 @@
             const p = document.getElementById('loading-percent');
             
             try {
-                const steps = [
-                    {m:"Generiere Board...", v:20}, {m:"Lade Texturen...", v:50},
-                    {m:"Erstelle Figuren...", v:80}, {m:"Starte 3D...", v:100}
-                ];
-                
+                const steps = [{m:"Generiere Board...", v:30}, {m:"Erstelle Figuren...", v:70}, {m:"Fertig...", v:100}];
                 for(let s of steps) {
                     l.innerText = s.m; b.style.width=s.v+"%"; p.innerText=s.v+"%";
-                    await new Promise(r=>setTimeout(r, 600));
+                    await new Promise(r=>setTimeout(r, 500));
                 }
-
                 if(!game) game = new Game3D(data);
                 l.innerText = "Warte auf Server...";
                 
-                setTimeout(() => {
-                    document.getElementById('force-start-btn').style.display = 'block';
-                }, 4000);
-
+                setTimeout(() => document.getElementById('force-start-btn').style.display='block', 3000);
             } catch(e) {
                 l.innerText = "FEHLER: " + e.message;
                 l.style.color = "red";
@@ -272,7 +260,6 @@
                     document.getElementById('turn-name').style.color = '#'+COLORS[d.activeColor].toString(16);
                     this.timer(d.timeout);
 
-                    // Auto-Switch wenn Ladescreen noch da
                     document.getElementById('loading-screen').classList.add('hidden');
                     document.getElementById('hud-layer').classList.remove('hidden');
 
@@ -452,14 +439,9 @@
             }
         }
 
-        // --- BOARD (FIXED) ---
+        // --- BOARD ---
         class Board {
-            constructor(scene, traps) { 
-                this.scene = scene; // FIXED: Scene Variable heißt jetzt 'scene'
-                this.traps = traps; 
-                this.S = 2.5; 
-                this.mk(); 
-            }
+            constructor(s,t) { this.scene=s; this.traps=t; this.s=2.5; this.mk(); }
             mk() {
                 const p = new THREE.Mesh(new THREE.BoxGeometry(60,1,60), new THREE.MeshStandardMaterial({color:0x221111}));
                 p.position.y=-0.6; p.receiveShadow=true; this.scene.add(p);
@@ -483,7 +465,7 @@
                 }
             }
             safe(c, step, rot) {
-                 const v = new THREE.Vector3(0,0,(5-step)*this.S);
+                 const v = new THREE.Vector3(0,0,(5-step)*this.s);
                  const ang = -rot*Math.PI/2;
                  const rx = v.x*Math.cos(ang)-v.z*Math.sin(ang); const rz = v.x*Math.sin(ang)+v.z*Math.cos(ang);
                  const m = new THREE.Mesh(new THREE.BoxGeometry(2,0.2,2), new THREE.MeshStandardMaterial({color:COLORS[c]}));
@@ -491,7 +473,7 @@
             }
             vec(i) {
                 const a=Math.floor(i/10), l=i%10; let x=0,z=0;
-                if(l<5){x=1*this.S; z=(5-l)*this.S;} else {x=(l-3)*this.S; z=1*this.S;}
+                if(l<5){x=1*this.s; z=(5-l)*this.s;} else {x=(l-3)*this.s; z=1*this.s;}
                 const ang = -a*Math.PI/2;
                 return new THREE.Vector3(x*Math.cos(ang)-z*Math.sin(ang), 0.1, x*Math.sin(ang)+z*Math.cos(ang));
             }
@@ -503,7 +485,7 @@
                     return new THREE.Vector3(x,0,z);
                 }
                 if(i>=40) {
-                     const st = i-40+1; const v = new THREE.Vector3(0,0,(5-st)*this.S);
+                     const st = i-40+1; const v = new THREE.Vector3(0,0,(5-st)*this.s);
                      let r=0; if(c==='blue')r=1; if(c==='green')r=2; if(c==='yellow')r=3;
                      const ang = -r*Math.PI/2;
                      return new THREE.Vector3(v.x*Math.cos(ang)-v.z*Math.sin(ang), 0, v.x*Math.sin(ang)+v.z*Math.cos(ang));
