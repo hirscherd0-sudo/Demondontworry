@@ -1,7 +1,7 @@
 {
-  "name": "horror-ludo-repair-final",
-  "version": "10.0.0",
-  "description": "Ludo with Load Fix",
+  "name": "horror-ludo-master",
+  "version": "11.0.0",
+  "description": "Ludo with Server Bots and Classic Board",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
